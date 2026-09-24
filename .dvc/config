@@ -1,0 +1,6 @@
+[core]
+    remote = r2
+['remote "r2"']
+    url = s3://cs7267-injection-data/dvcstore
+    endpointurl = https://799ebd5a3c7e29ad972c3a3e72737a09.r2.cloudflarestorage.com
+    region = auto
