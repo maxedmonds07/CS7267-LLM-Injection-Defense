@@ -5,8 +5,10 @@ DVC := uv run dvc
 REMOTE := r2
 R2_PREFIX ?= dvcstore
 
-# NewsQA can't be downloaded directly (see config.yaml `generated.bipia_webqa`).
+# NewsQA sources (see config.yaml `generated.bipia_webqa`); both come with terms of use.
 NEWSQA_CACHE := .cache/newsqa
+NEWSQA_ZIP_URL := https://download.microsoft.com/download/1/d/8/1d830cee-f8d1-4807-9224-de35a8f08dc4/newsqa-data-v1.zip
+CNN_STORIES_DRIVE_ID := 0BwmD_VLjROrfTHk4NFg2SndKcjQ
 NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
@@ -51,13 +53,10 @@ push-data: ## Upload tracked data to R2
 # One-time, by one teammate: everyone else gets the CSV from R2 via `make data`.
 # The bipia_webqa stage is registered here, not up front, so `dvc repro` never sees a
 # stage whose input doesn't exist yet. Commit the resulting .dvc, dvc.yaml and dvc.lock.
-# First download, accepting each source's terms, into $(NEWSQA_CACHE)/:
-#   newsqa-data-v1.tar.gz  https://msropendata.com/datasets/939b1042-6402-4697-9c15-7a28de7e1321
-#   cnn_stories.tgz        https://cs.nyu.edu/~kcho/DMQA/ (CNN "Stories")
-newsqa: ## Build the NewsQA CSV, track it with DVC, and add the bipia_webqa stage
-	@for f in newsqa-data-v1.tar.gz cnn_stories.tgz; do \
-		test -f $(NEWSQA_CACHE)/$$f || { echo "missing $(NEWSQA_CACHE)/$$f (see Makefile comment)"; exit 1; }; \
-	done
+# Downloads need ACCEPT_TERMS=1, confirming you accept the terms of:
+#   NewsQA       https://www.microsoft.com/en-us/download/details.aspx?id=57162 (LICENSE.pdf in the zip)
+#   CNN stories  https://cs.nyu.edu/~kcho/DMQA/
+newsqa: $(NEWSQA_CACHE)/newsqa-data-v1.tar.gz $(NEWSQA_CACHE)/cnn_stories.tgz ## Build the NewsQA CSV, track it with DVC, and add the bipia_webqa stage (ACCEPT_TERMS=1)
 	rm -rf $(NEWSQA_CACHE)/repo && mkdir -p $(NEWSQA_CACHE)/repo
 	curl -sSfL https://codeload.github.com/Maluuba/newsqa/tar.gz/$(NEWSQA_COMMIT) | tar xz --strip-components=1 -C $(NEWSQA_CACHE)/repo
 	cp $(NEWSQA_CACHE)/newsqa-data-v1.tar.gz $(NEWSQA_CACHE)/cnn_stories.tgz $(NEWSQA_CACHE)/repo/maluuba/newsqa/
@@ -72,3 +71,25 @@ newsqa: ## Build the NewsQA CSV, track it with DVC, and add the bipia_webqa stag
 		--outs data/generated/bipia/qa \
 		python src/data/generate_bipia.py --config config.yaml --task bipia_webqa
 	$(DVC) repro bipia_webqa
+
+define require_terms
+	@test "$(ACCEPT_TERMS)" = 1 || { echo "Downloading $(@F) requires ACCEPT_TERMS=1 (see the newsqa target's comment)"; exit 1; }
+endef
+
+$(NEWSQA_CACHE)/newsqa-data-v1.zip:
+	$(require_terms)
+	mkdir -p $(@D)
+	curl -sSfL -o $@.part $(NEWSQA_ZIP_URL) && mv $@.part $@
+
+# Maluuba's container only reads the tarball (its CMD deletes an extracted newsqa-data-*.csv),
+# while Microsoft now ships a zip; repack the CSV at the tarball root.
+$(NEWSQA_CACHE)/newsqa-data-v1.tar.gz: $(NEWSQA_CACHE)/newsqa-data-v1.zip
+	unzip -o -j -d $(@D) $< newsqa-data-v1/newsqa-data-v1.csv
+	tar czf $@ -C $(@D) newsqa-data-v1.csv
+	rm $(@D)/newsqa-data-v1.csv
+
+# gdown handles Drive's virus-scan confirmation page for large files, which plain curl saves instead.
+$(NEWSQA_CACHE)/cnn_stories.tgz:
+	$(require_terms)
+	mkdir -p $(@D)
+	uvx gdown@6.4.0 $(CNN_STORIES_DRIVE_ID) -O $@.part && mv $@.part $@
