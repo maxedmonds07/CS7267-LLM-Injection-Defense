@@ -1,0 +1,11 @@
+stages:
+  fetch:
+    cmd: python src/data/fetch.py --config config.yaml
+    deps:
+      - src/data/fetch.py
+    params:
+      - config.yaml:
+          - paths.raw_dir
+          - datasets
+    outs:
+      - data/raw

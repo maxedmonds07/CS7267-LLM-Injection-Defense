@@ -1,0 +1,73 @@
+schema: '2.0'
+stages:
+  fetch:
+    cmd: python src/data/fetch.py --config config.yaml
+    deps:
+    - path: src/data/fetch.py
+      hash: md5
+      md5: 4d85c615f539aad5c3c6a55f6bb24126
+      size: 6066
+    params:
+      config.yaml:
+        datasets:
+          poisonedrag:
+            repo: sleeepeer/PoisonedRAG
+            commit: f660d72174f06b13fae5163ce656e7b235db858f
+            license: MIT
+            surface: rag
+            role: train + in-distribution test
+            paths:
+            - results/adv_targeted_results/
+            - results/beir_results/nq-contriever.json
+            - results/beir_results/msmarco-contriever.json
+            - results/beir_results/hotpotqa-contriever.json
+            beir:
+              url: 
+                https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{name}.zip
+              top_k: 100
+              subsets:
+                nq: test
+                msmarco: train
+                hotpotqa: test
+          bipia:
+            repo: microsoft/BIPIA
+            commit: a004b69ec0dd446e0afd461d98cb5e96e120a5d0
+            license: MIT (TableQA context derived from WikiTableQuestions, CC 
+              BY-SA 4.0)
+            surface: rag
+            role: attack-family diversity
+            paths:
+            - benchmark/email/
+            - benchmark/table/
+            - benchmark/code/
+            - benchmark/text_attack_train.json
+            - benchmark/text_attack_test.json
+            - benchmark/code_attack_train.json
+            - benchmark/code_attack_test.json
+          mcptox:
+            repo: zhiqiangwang4/MCPTox-Benchmark
+            commit: f85189f9ad12504c197c7f920ab818a40657b1fa
+            license: none stated upstream (team-internal copy approved)
+            surface: mcp
+            role: held-out surface for LOSO
+            paths:
+            - response_all.json
+            - pure_tool.json
+          msb:
+            repo: dongsenzhang/MSB
+            commit: c1d6a70171e4d2c44c87a2ae909d13df00c6aa8d
+            license: MIT
+            surface: both
+            role: fully held-out transfer test
+            paths:
+            - data/agent_task.jsonl
+            - data/attack_task.jsonl
+            - data/attack_type.jsonl
+            - data/tools/
+        paths.raw_dir: data/raw
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: dc9f2d74b5d4af01fba5171bc545a230.dir
+      size: 77819239
+      nfiles: 128
