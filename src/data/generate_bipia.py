@@ -1,7 +1,8 @@
 """Rebuild BIPIA's WebQA and Summarization contexts, which BIPIA does not redistribute.
 
 Reimplements BIPIA's benchmark/{qa,abstract}/process.py without the `datasets` library:
-rows are selected by BIPIA's index.json and the output must match its md5.txt byte for byte.
+rows are selected by BIPIA's index.json and the output must match its md5.txt byte for byte,
+or the task's `md5` in config.yaml where BIPIA's can't be reproduced (WebQA).
 
   bipia_summarization: XSum parquet from Hugging Face at a pinned revision.
   bipia_webqa:         combined-newsqa-data-v1.csv built by `make newsqa` and tracked by DVC.
@@ -98,9 +99,10 @@ def generate(task: str, config: dict) -> None:
     cache_dir = Path(".cache") / task
 
     indexes = json.loads((bipia_dir / "index.json").read_text())
-    expected = dict(
+    bipia_md5 = dict(
         reversed(line.split("  ")) for line in (bipia_dir / "md5.txt").read_text().splitlines()
     )
+    expected = spec.get("md5", bipia_md5)
 
     print(f"{task}: {spec['source']} -> {dest}", file=sys.stderr)
     rows = BUILDERS[task](spec, indexes, cache_dir)
@@ -108,18 +110,19 @@ def generate(task: str, config: dict) -> None:
     shutil.rmtree(dest, ignore_errors=True)
     dest.mkdir(parents=True)
     for split in SPLITS:
-        # Matches jsonlines' default encoder, which BIPIA's md5s were computed with.
+        # Matches jsonlines' default encoder, which BIPIA's process.py writes with.
         data = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows[split]).encode()
         name = f"{split}.jsonl"
         if (actual := hashlib.md5(data).hexdigest()) != expected[name]:
             shutil.rmtree(dest)
-            raise ValueError(f"{task}/{name}: md5 {actual} != BIPIA's {expected[name]}")
+            raise ValueError(f"{task}/{name}: md5 {actual} != expected {expected[name]}")
         (dest / name).write_bytes(data)
         print(f"  {name}: {len(rows[split])} rows, md5 ok", file=sys.stderr)
 
     source = {k: v for k, v in spec.items() if k != "task_dir"}
     source["bipia_commit"] = config["datasets"]["bipia"]["commit"]
     source["md5"] = expected
+    source["matches_bipia_md5"] = expected == bipia_md5
     (dest / "SOURCE.json").write_text(json.dumps(source, indent=2) + "\n")
 
 

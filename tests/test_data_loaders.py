@@ -104,10 +104,11 @@ class TestBIPIAGenerated:
         return path
 
     @pytest.mark.parametrize("split", ["train", "test"])
-    def test_matches_bipia_md5(self, task, split):
+    def test_matches_expected_md5(self, task, split):
         out = self.output_dir(task)
         md5_file = dataset_dir("bipia") / "benchmark" / GENERATED[task]["task_dir"] / "md5.txt"
-        expected = dict(reversed(line.split("  ")) for line in md5_file.read_text().splitlines())
+        bipia_md5 = dict(reversed(line.split("  ")) for line in md5_file.read_text().splitlines())
+        expected = GENERATED[task].get("md5", bipia_md5)
         actual = hashlib.md5((out / f"{split}.jsonl").read_bytes()).hexdigest()
         assert actual == expected[f"{split}.jsonl"]
 

@@ -51,12 +51,11 @@ push-data: ## Upload tracked data to R2
 	$(DVC) push
 
 # One-time, by one teammate: everyone else gets the CSV from R2 via `make data`.
-# The bipia_webqa stage is registered here, not up front, so `dvc repro` never sees a
-# stage whose input doesn't exist yet. Commit the resulting .dvc, dvc.yaml and dvc.lock.
+# Only rerun to rebuild the CSV; commit the resulting .dvc and dvc.lock.
 # Downloads need ACCEPT_TERMS=1, confirming you accept the terms of:
 #   NewsQA       https://www.microsoft.com/en-us/download/details.aspx?id=57162 (LICENSE.pdf in the zip)
 #   CNN stories  https://cs.nyu.edu/~kcho/DMQA/
-newsqa: $(NEWSQA_CACHE)/newsqa-data-v1.tar.gz $(NEWSQA_CACHE)/cnn_stories.tgz ## Build the NewsQA CSV, track it with DVC, and add the bipia_webqa stage (ACCEPT_TERMS=1)
+newsqa: $(NEWSQA_CACHE)/newsqa-data-v1.tar.gz $(NEWSQA_CACHE)/cnn_stories.tgz ## Build the NewsQA CSV, track it with DVC, and run bipia_webqa (ACCEPT_TERMS=1)
 	rm -rf $(NEWSQA_CACHE)/repo && mkdir -p $(NEWSQA_CACHE)/repo
 	curl -sSfL https://codeload.github.com/Maluuba/newsqa/tar.gz/$(NEWSQA_COMMIT) | tar xz --strip-components=1 -C $(NEWSQA_CACHE)/repo
 	cp $(NEWSQA_CACHE)/newsqa-data-v1.tar.gz $(NEWSQA_CACHE)/cnn_stories.tgz $(NEWSQA_CACHE)/repo/maluuba/newsqa/
@@ -64,12 +63,6 @@ newsqa: $(NEWSQA_CACHE)/newsqa-data-v1.tar.gz $(NEWSQA_CACHE)/cnn_stories.tgz ##
 	mkdir -p $(dir $(NEWSQA_CSV))
 	cp $(NEWSQA_CACHE)/repo/combined-newsqa-data-v1.csv $(NEWSQA_CSV)
 	$(DVC) add $(NEWSQA_CSV)
-	$(DVC) stage add --force --name bipia_webqa \
-		--deps src/data/generate_bipia.py --deps src/data/fetch.py \
-		--deps data/raw/bipia/benchmark/qa --deps $(NEWSQA_CSV) \
-		--params config.yaml:paths.generated_dir,generated.bipia_webqa \
-		--outs data/generated/bipia/qa \
-		python src/data/generate_bipia.py --config config.yaml --task bipia_webqa
 	$(DVC) repro bipia_webqa
 
 define require_terms
@@ -82,10 +75,11 @@ $(NEWSQA_CACHE)/newsqa-data-v1.zip:
 	curl -sSfL -o $@.part $(NEWSQA_ZIP_URL) && mv $@.part $@
 
 # Maluuba's container only reads the tarball (its CMD deletes an extracted newsqa-data-*.csv),
-# while Microsoft now ships a zip; repack the CSV at the tarball root.
+# while Microsoft now ships a zip; repack the CSV at the tarball root. Python's tarfile, not
+# macOS tar, which adds ._ files and binary xattr headers that its Python 2 tarfile can't decode.
 $(NEWSQA_CACHE)/newsqa-data-v1.tar.gz: $(NEWSQA_CACHE)/newsqa-data-v1.zip
 	unzip -o -j -d $(@D) $< newsqa-data-v1/newsqa-data-v1.csv
-	tar czf $@ -C $(@D) newsqa-data-v1.csv
+	cd $(@D) && uv run --no-project python -m tarfile -c $(@F) newsqa-data-v1.csv
 	rm $(@D)/newsqa-data-v1.csv
 
 # gdown handles Drive's virus-scan confirmation page for large files, which plain curl saves instead.

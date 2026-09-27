@@ -88,8 +88,8 @@ stages:
       size: 6066
     - path: src/data/generate_bipia.py
       hash: md5
-      md5: 7a2d13a72ffab68c4028b202805a9b61
-      size: 5287
+      md5: 41a057736d16c3e5ad1cfa5036f874b5
+      size: 5464
     params:
       config.yaml:
         generated.bipia_summarization:
@@ -101,6 +101,44 @@ stages:
     outs:
     - path: data/generated/bipia/abstract
       hash: md5
-      md5: 7e82399600cd0d2ee1fb36e6c3652e9c.dir
-      size: 1921734
+      md5: 567ab68c401cf43c7f1417fcec9819a4.dir
+      size: 1921763
+      nfiles: 3
+  bipia_webqa:
+    cmd: python src/data/generate_bipia.py --config config.yaml --task 
+      bipia_webqa
+    deps:
+    - path: data/external/newsqa/combined-newsqa-data-v1.csv
+      hash: md5
+      md5: 4a442b7d3af03a60a3edd7f8407f4e44
+      size: 467226961
+    - path: data/raw/bipia/benchmark/qa
+      hash: md5
+      md5: 24040421277fec5da03293cb43f7f841.dir
+      size: 10276
+      nfiles: 3
+    - path: src/data/fetch.py
+      hash: md5
+      md5: 4d85c615f539aad5c3c6a55f6bb24126
+      size: 6066
+    - path: src/data/generate_bipia.py
+      hash: md5
+      md5: 41a057736d16c3e5ad1cfa5036f874b5
+      size: 5464
+    params:
+      config.yaml:
+        generated.bipia_webqa:
+          task_dir: qa
+          source: data/external/newsqa/combined-newsqa-data-v1.csv
+          license: NewsQA terms (Microsoft Research) + CNN stories (DeepMind 
+            Q&A)
+          md5:
+            train.jsonl: df74c1b14ee4d40e476a41cc4d7a6ea3
+            test.jsonl: f1870768dbdfd48896ce39a1dfb3367e
+        paths.generated_dir: data/generated
+    outs:
+    - path: data/generated/bipia/qa
+      hash: md5
+      md5: 40c9301f6ba983b6ae3918e17d50bcd4.dir
+      size: 2571233
       nfiles: 3
