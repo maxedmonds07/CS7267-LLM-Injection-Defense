@@ -40,6 +40,8 @@ stages:
             - benchmark/email/
             - benchmark/table/
             - benchmark/code/
+            - benchmark/qa/
+            - benchmark/abstract/
             - benchmark/text_attack_train.json
             - benchmark/text_attack_test.json
             - benchmark/code_attack_train.json
@@ -68,6 +70,37 @@ stages:
     outs:
     - path: data/raw
       hash: md5
-      md5: dc9f2d74b5d4af01fba5171bc545a230.dir
-      size: 77819239
-      nfiles: 128
+      md5: 2487d054075848d950b43b59a7bdd8df.dir
+      size: 77838896
+      nfiles: 134
+  bipia_summarization:
+    cmd: python src/data/generate_bipia.py --config config.yaml --task 
+      bipia_summarization
+    deps:
+    - path: data/raw/bipia/benchmark/abstract
+      hash: md5
+      md5: 64375658239a22433f92cf28449f3729.dir
+      size: 9183
+      nfiles: 3
+    - path: src/data/fetch.py
+      hash: md5
+      md5: 4d85c615f539aad5c3c6a55f6bb24126
+      size: 6066
+    - path: src/data/generate_bipia.py
+      hash: md5
+      md5: 7a2d13a72ffab68c4028b202805a9b61
+      size: 5287
+    params:
+      config.yaml:
+        generated.bipia_summarization:
+          task_dir: abstract
+          source: EdinburghNLP/xsum
+          revision: 7d4d486c2f8ef850b1a11aead99b894ff3dd7da9
+          license: XSum terms (BBC articles; research use)
+        paths.generated_dir: data/generated
+    outs:
+    - path: data/generated/bipia/abstract
+      hash: md5
+      md5: 7e82399600cd0d2ee1fb36e6c3652e9c.dir
+      size: 1921734
+      nfiles: 3
