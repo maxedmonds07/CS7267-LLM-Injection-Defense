@@ -14,7 +14,8 @@ export MLFLOW_AUTH_CONFIG_PATH=/tmp/basic_auth.ini
 
 exec mlflow server \
     --backend-store-uri "$DATABASE_URL" \
-    --artifacts-destination "s3://$MLFLOW_ARTIFACT_BUCKET" \
+    --no-serve-artifacts \
+    --default-artifact-root "s3://$MLFLOW_ARTIFACT_BUCKET" \
     --host 0.0.0.0 \
     --port "${PORT:-10000}" \
     --workers 1 \
