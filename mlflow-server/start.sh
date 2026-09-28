@@ -13,10 +13,10 @@ EOF
 export MLFLOW_AUTH_CONFIG_PATH=/tmp/basic_auth.ini
 
 exec mlflow server \
+    --app-name basic-auth \
     --backend-store-uri "$DATABASE_URL" \
-    --no-serve-artifacts \
-    --default-artifact-root "s3://$MLFLOW_ARTIFACT_BUCKET" \
+    --artifacts-destination "s3://$MLFLOW_ARTIFACT_BUCKET" \
     --host 0.0.0.0 \
-    --port "${PORT:-10000}" \
+    --port 7860 \
     --workers 1 \
-    --allowed-hosts "$RENDER_EXTERNAL_HOSTNAME"
+    --allowed-hosts "*.hf.space"
