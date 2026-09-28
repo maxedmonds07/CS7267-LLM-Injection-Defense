@@ -18,4 +18,5 @@ exec mlflow server \
     --artifacts-destination "s3://$MLFLOW_ARTIFACT_BUCKET" \
     --host 0.0.0.0 \
     --port "${PORT:-10000}" \
+    --workers 1 \
     --allowed-hosts "$RENDER_EXTERNAL_HOSTNAME"
