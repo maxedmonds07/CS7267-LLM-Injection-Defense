@@ -1,4 +1,5 @@
 mlflow[auth]
 psycopg2-binary
 psycopg2
+psycopg
 boto3
