@@ -1,5 +1,6 @@
 """Sanity checks on data/raw as produced by the `fetch` stage (`make data`)."""
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -10,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONFIG = yaml.safe_load((ROOT / "config.yaml").read_text())
 RAW = ROOT / CONFIG["paths"]["raw_dir"]
 DATASETS = CONFIG["datasets"]
+GENERATED = CONFIG["generated"]
 
 
 def dataset_dir(name: str) -> Path:
@@ -89,6 +91,34 @@ class TestBIPIA:
         assert attacks
         for family, prompts in attacks.items():
             assert prompts and all(isinstance(p, str) for p in prompts), family
+
+
+@pytest.mark.parametrize("task", GENERATED)
+class TestBIPIAGenerated:
+    """Contexts rebuilt by the bipia_* stages (`dvc repro`)."""
+
+    def output_dir(self, task: str) -> Path:
+        path = ROOT / CONFIG["paths"]["generated_dir"] / "bipia" / GENERATED[task]["task_dir"]
+        if not (path / "SOURCE.json").exists():
+            pytest.skip(f"{path} not generated; run `make data`")
+        return path
+
+    @pytest.mark.parametrize("split", ["train", "test"])
+    def test_matches_expected_md5(self, task, split):
+        out = self.output_dir(task)
+        md5_file = dataset_dir("bipia") / "benchmark" / GENERATED[task]["task_dir"] / "md5.txt"
+        bipia_md5 = dict(reversed(line.split("  ")) for line in md5_file.read_text().splitlines())
+        expected = GENERATED[task].get("md5", bipia_md5)
+        actual = hashlib.md5((out / f"{split}.jsonl").read_bytes()).hexdigest()
+        assert actual == expected[f"{split}.jsonl"]
+
+    @pytest.mark.parametrize("split", ["train", "test"])
+    def test_rows_match_index(self, task, split):
+        out = self.output_dir(task)
+        index = dataset_dir("bipia") / "benchmark" / GENERATED[task]["task_dir"] / "index.json"
+        rows = read_jsonl(out / f"{split}.jsonl")
+        assert len(rows) == len(json.loads(index.read_text())[split])
+        assert all({"context", "ideal"} <= row.keys() and row["context"] for row in rows)
 
 
 class TestMCPTox:

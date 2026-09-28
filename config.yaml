@@ -5,6 +5,7 @@
 paths:
   raw_dir: data/raw
   cache_dir: .cache/beir  # full BEIR zips (~2.2 GB), kept out of git and DVC
+  generated_dir: data/generated
 
 datasets:
   poisonedrag:
@@ -35,11 +36,14 @@ datasets:
     surface: rag
     role: attack-family diversity
     # WebQA (NewsQA) and Summarization (XSum) contexts are not redistributed upstream;
-    # they need a separate generation stage.
+    # benchmark/qa/ and benchmark/abstract/ hold the row indexes and md5s that the
+    # bipia_* stages use to rebuild them (see `generated` below).
     paths:
       - benchmark/email/
       - benchmark/table/
       - benchmark/code/
+      - benchmark/qa/
+      - benchmark/abstract/
       - benchmark/text_attack_train.json
       - benchmark/text_attack_test.json
       - benchmark/code_attack_train.json
@@ -66,6 +70,29 @@ datasets:
       - data/attack_task.jsonl
       - data/attack_type.jsonl
       - data/tools/
+
+# Contexts rebuilt from third-party sources by the bipia_* stages in dvc.yaml, following
+# BIPIA's benchmark/{qa,abstract}/process.py. Output must match BIPIA's md5.txt byte for byte,
+# unless a task pins its own `md5`.
+generated:
+  bipia_summarization:
+    task_dir: abstract
+    source: EdinburghNLP/xsum  # Hugging Face dataset, native parquet
+    revision: 7d4d486c2f8ef850b1a11aead99b894ff3dd7da9
+    license: XSum terms (BBC articles; research use)
+  bipia_webqa:
+    task_dir: qa
+    # Built once by `make newsqa` (Maluuba toolchain + CNN stories, both behind terms of use)
+    # and tracked with `dvc add`, so it lives only in the team's private R2 remote.
+    source: data/external/newsqa/combined-newsqa-data-v1.csv
+    license: NewsQA terms (Microsoft Research) + CNN stories (DeepMind Q&A)
+    # BIPIA's committed qa/md5.txt can't be reproduced from the public inputs: row order
+    # matches (test[87] is upstream's hand-fixed Janine Sligar row), but the story text of
+    # their NewsQA build differs. Other public rebuilds disagree with both, so the check
+    # pins our official-toolchain build (`make newsqa`) instead.
+    md5:
+      train.jsonl: df74c1b14ee4d40e476a41cc4d7a6ea3
+      test.jsonl: f1870768dbdfd48896ce39a1dfb3367e
 
 # Not fetched: AgentDojo ships its suites inside the Python package.
 harnesses:

@@ -9,3 +9,31 @@ stages:
           - datasets
     outs:
       - data/raw
+
+  bipia_summarization:
+    cmd: python src/data/generate_bipia.py --config config.yaml --task bipia_summarization
+    deps:
+      - src/data/generate_bipia.py
+      - src/data/fetch.py
+      - data/raw/bipia/benchmark/abstract
+    params:
+      - config.yaml:
+          - paths.generated_dir
+          - generated.bipia_summarization
+    outs:
+      - data/generated/bipia/abstract
+
+  # Its input CSV is built and tracked by `make newsqa` (see Makefile).
+  bipia_webqa:
+    cmd: python src/data/generate_bipia.py --config config.yaml --task bipia_webqa
+    deps:
+      - src/data/generate_bipia.py
+      - src/data/fetch.py
+      - data/raw/bipia/benchmark/qa
+      - data/external/newsqa/combined-newsqa-data-v1.csv
+    params:
+      - config.yaml:
+          - paths.generated_dir
+          - generated.bipia_webqa
+    outs:
+      - data/generated/bipia/qa
