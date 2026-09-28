@@ -13,7 +13,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: help install r2-remote r2-credentials check-remote data push-data newsqa
+.PHONY: help install r2-remote r2-credentials check-remote data push-data push-large newsqa
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -49,6 +49,13 @@ data: ## Pull data from R2 and rebuild any stale pipeline stages
 
 push-data: ## Upload tracked data to R2
 	$(DVC) push
+
+# DVC uploads large files in fixed 50 MiB parts, which slow uplinks can't finish before the
+# connection is cut (IncompleteBody). Upload one file with small parts, then `make push-data`.
+PART_MIB ?= 8
+push-large: ## Upload one large DVC-tracked file in small parts: make push-large DVC_FILE=path.dvc
+	@test -n "$(DVC_FILE)" || { echo "DVC_FILE is required"; exit 1; }
+	uv run --with boto3 python scripts/upload_dvc_object.py $(DVC_FILE) $(PART_MIB)
 
 # One-time, by one teammate: everyone else gets the CSV from R2 via `make data`.
 # Only rerun to rebuild the CSV; commit the resulting .dvc and dvc.lock.
