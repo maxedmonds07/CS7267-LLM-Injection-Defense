@@ -715,85 +715,7 @@ does not automatically create an MLflow run.
 
 ---
 
-# 9. What Happens When Code Is Merged Into `main`?
-
-Suppose someone:
-
-```text
-1. Develops Model A
-2. Starts MLflow
-3. Runs Model A
-4. Logs the experiment
-5. Commits the code
-6. Creates a Pull Request
-7. Merges the code into main
-```
-
-The original MLflow run remains unchanged.
-
-GitHub:
-
-```text
-Feature branch
-      |
-      v
-Pull Request
-      |
-      v
-main
-```
-
-MLflow:
-
-```text
-Experiment
-    |
-    └── Existing development run
-```
-
-The Git merge does not move, delete, or recreate that MLflow run.
-
----
-
-# 10. Does MLflow Show Only Models From `main`?
-
-No.
-
-MLflow displays all runs stored in the shared database.
-
-This may include:
-
-```text
-Development runs
-Feature branch runs
-Main branch runs
-Hyperparameter trials
-Failed experiments
-Final experiments
-```
-
-We therefore use tags to identify where runs came from.
-
-Example:
-
-```text
-git_branch = feature/random-forest
-git_commit = abc123
-team_member = Alice
-model_status = development
-```
-
-A final run could contain:
-
-```text
-git_branch = main
-git_commit = def456
-model_status = final
-```
-
----
-
-# 11. Recommended Project Workflow
+# 9. Recommended Project Workflow
 
 A recommended workflow is:
 
@@ -863,7 +785,7 @@ accepted project implementation
 
 ---
 
-# 12. What Should Be Logged During Development?
+# 10. What Should Be Logged During Development?
 
 For most experiments, log:
 
@@ -896,7 +818,7 @@ We do **not** need to save the actual trained model for every experiment.
 
 ---
 
-# 13. When Should We Store the Actual Model?
+# 11. When Should We Store the Actual Model?
 
 Recommended policy:
 
@@ -932,7 +854,7 @@ Only use this when the trained model itself should be preserved.
 
 ---
 
-# 14. Recommended Git Information to Log
+# 12. Recommended Git Information to Log
 
 Important runs should include:
 
@@ -996,9 +918,9 @@ git_commit:
 
 ---
 
-# 15. Team Member Identification
+# 13. Team Member Identification (optional)
 
-Each collaborator should set:
+It is better if each collaborator set:
 
 ```text
 MLFLOW_TEAM_MEMBER=
@@ -1042,7 +964,7 @@ logistic_v2          Carol
 
 ---
 
-# 16. Connecting Training Code to MLflow
+# 14. Connecting Training Code to MLflow
 
 Add:
 
@@ -1064,7 +986,7 @@ mlflow.set_experiment(
 
 ---
 
-# 17. Example Run
+# 15. Example Run
 
 ```python
 import mlflow
@@ -1119,7 +1041,7 @@ Because it is stored in Neon, other collaborators will also see it when they sta
 
 ---
 
-# 18. Logging Artifacts
+# 16. Logging Artifacts
 
 Artifacts are files associated with a run.
 
@@ -1151,26 +1073,7 @@ Neon Object Storage
 
 ---
 
-# 19. Logging Models
-
-For Scikit-Learn:
-
-```python
-import mlflow.sklearn
-
-mlflow.sklearn.log_model(
-    sk_model=model,
-    name="model"
-)
-```
-
-The run metadata is stored in PostgreSQL.
-
-The actual trained model files are stored in Object Storage.
-
----
-
-# 20. Suggested Experiment Organization
+# 17. Suggested Experiment Organization
 
 Use meaningful experiment names.
 
@@ -1199,7 +1102,7 @@ final_models
 
 ---
 
-# 21. Example MLflow Structure
+# 18. Example MLflow Structure
 
 Suppose three collaborators are testing models.
 
@@ -1240,7 +1143,7 @@ Experiment: final_models
 
 ---
 
-# 22. Deleting Experiments and Models
+# 19. Deleting Experiments and Models
 
 Deleting an experiment from the MLflow UI initially performs a logical/soft deletion.
 
@@ -1256,7 +1159,7 @@ For team safety:
 
 ---
 
-# 23. Important Team Rules
+# 20. Important Team Rules
 
 ### Rule 1
 
@@ -1303,186 +1206,3 @@ Never commit `.env` or Neon credentials.
 Do not delete shared experiments or models without discussing it with the team.
 
 ---
-
-# 24. Typical Development Example
-
-A typical workflow is:
-
-```text
-1. Pull latest code
-
-2. Create or switch to your development branch
-
-3. Start local MLflow
-
-4. Develop/train model
-
-5. Log experiment to MLflow
-
-6. Compare metrics with existing experiments
-
-7. Commit code
-
-8. Push code
-
-9. Create Pull Request
-
-10. Merge approved code into main
-
-11. Pull latest main
-
-12. Rerun selected model from main
-
-13. Log final run
-
-14. Store final model if required
-```
-
-A final run might contain:
-
-```text
-model = RandomForest
-
-accuracy = 0.91
-
-f1_macro = 0.89
-
-git_branch = main
-
-git_commit = 93ad281
-
-model_status = final
-```
-
-This gives us:
-
-```text
-GitHub
-→ authoritative source code
-
-MLflow
-→ experiment history and model results
-```
-
----
-
-# 25. Daily Quick Start
-
-For normal work:
-
-```bash
-git pull
-```
-
-Then:
-
-```bash
-cd mlflow-server
-```
-
-Activate the environment.
-
-### Windows
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-### macOS / Linux
-
-```bash
-source .venv/bin/activate
-```
-
-Start MLflow:
-
-```bash
-python start_mlflow.py
-```
-
-Open:
-
-```text
-http://127.0.0.1:5000
-```
-
-Then run training code that uses:
-
-```python
-mlflow.set_tracking_uri(
-    "http://127.0.0.1:5000"
-)
-```
-
-When finished:
-
-```text
-Ctrl + C
-```
-
-The local MLflow server stops, but the shared experiment information remains stored in Neon.
-
----
-
-# 26. Final Mental Model
-
-The easiest way to understand the system is:
-
-```text
-GitHub
-=
-Where is the code?
-
-
-MLflow
-=
-What happened when we ran the code?
-
-
-Neon PostgreSQL
-=
-Shared experiment metadata
-
-
-Neon Object Storage
-=
-Shared models and artifact files
-```
-
-Most importantly:
-
-```text
-Git push
-    |
-    X
-Does NOT automatically update MLflow
-```
-
-but:
-
-```text
-Run code with MLflow logging
-             |
-             v
-        Updates MLflow
-```
-
-And:
-
-```text
-model.fit(...)
-      |
-      X
-Does NOT automatically store the model
-```
-
-while:
-
-```text
-mlflow.sklearn.log_model(...)
-             |
-             v
-Stores the trained model
-```
-
-Each collaborator runs MLflow locally, while all persistent experiment information is shared through Neon.
