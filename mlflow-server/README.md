@@ -1,1392 +1,1346 @@
-**# Shared MLflow Setup**
+# Shared MLflow Setup
 
-**## CS7267 – LLM Injection Defense Project**
+## CS7267 – LLM Injection Defense Project
 
-This project uses **\*\*MLflow\*\*** to centrally track machine-learning experiments performed by different team members.
+This project uses **MLflow** to centrally track machine-learning experiments performed by different team members.
 
-We do **\*\*not\*\*** maintain one continuously running cloud MLflow server.
+We do **not** maintain one continuously running cloud MLflow server.
 
 Instead:
 
-\- Each team member runs an MLflow server locally on their own computer.
+- Each team member runs an MLflow server locally on their own computer.
+- All local MLflow servers connect to the **same Neon PostgreSQL database**.
+- All local MLflow servers connect to the **same Neon Object Storage bucket**.
+- Therefore, everyone can see the same experiments, runs, parameters, metrics, and artifacts.
+- GitHub continues to handle source-code version control separately.
 
-\- All local MLflow servers connect to the **\*\*same Neon PostgreSQL database\*\***.
+---
 
-\- All local MLflow servers connect to the **\*\*same Neon Object Storage bucket\*\***.
+# 1. Architecture
 
-\- Therefore, everyone sees the same experiments, runs, parameters, metrics, and artifacts.
+```text
+                         GitHub Repository
+                    Source Code / Version Control
+                              |
+               --------------------------------
+               |              |               |
+           Member 1        Member 2        Member 3-5
+               |              |               |
+        Local MLflow     Local MLflow     Local MLflow
+       127.0.0.1:5000  127.0.0.1:5000  127.0.0.1:5000
+               |              |               |
+               ---------------|---------------
+                              |
+                              v
+                  Neon PostgreSQL Database
+                       FREE TIER
+                ------------------------
+                Experiments
+                Runs
+                Parameters
+                Metrics
+                Tags
+                Model metadata
 
-\- GitHub continues to handle source-code version control separately.
+                Free-plan allowance:
+                • 0.5 GB database storage
+                • 100 CU-hours/project
+                • 10 database branches
 
-\---
+                              |
+                              v
 
-**# 1. Architecture**
-\`\`\`text
+                  Neon Object Storage
+                       FREE TIER
+                ------------------------
+                Trained models
+                Plots
+                CSV files
+                Reports
+                Other MLflow artifacts
 
-                         GitHub Repository
+                Free-plan allowance:
+                • 5 GB object storage/project
+```
 
-                    Source Code / Version Control
+The PostgreSQL database stores MLflow metadata such as experiments, runs, parameters, metrics, and tags.
 
-                              |
+The Object Storage bucket stores larger files such as trained models, plots, reports, and other artifacts.
 
-               --------------------------------
+For this project, we should avoid unnecessarily storing large datasets or every intermediate trained model.
 
-               |              |               |
+---
 
-           Member 1        Member 2        Member 3-5
+# 2. First-Time Setup
 
-               |              |               |
+Each collaborator only needs to complete this section once.
 
-        Local MLflow     Local MLflow     Local MLflow
+## 2.1 Clone the Repository
 
-       127.0.0.1:5000  127.0.0.1:5000  127.0.0.1:5000
-
-               |              |               |
-
-               ---------------|---------------
-
-                              |
-
-                              v
-
-                  Neon PostgreSQL Database
-
-                       FREE TIER
-
-                ------------------------
-
-                MLflow experiments
-
-                Runs
-
-                Parameters
-
-                Metrics
-
-                Tags
-
-                Model metadata
-
-                Free-plan allowance:
-
-                • 0.5 GB database storage
-
-                • 100 CU-hours/project
-
-                • 10 database branches
-
-                              |
-
-                              |
-
-                              v
-
-                  Neon Object Storage
-
-                       FREE TIER
-
-                ------------------------
-
-                Models
-
-                Plots
-
-                CSV files
-
-                Reports
-
-                Other MLflow artifacts
-
-                Free-plan allowance:
-
-                • 5 GB object storage/project
-
-\`\`\`
-
-As of September 2026, Neon lists **\*\*0.5 GB of Postgres storage and 100 CU-hours per project\*\***, as well as 10 branches per project, on its Free plan. Neon also includes **\*\*5 GB of Object Storage per project\*\*** on the Free plan.
-
-For a university term project, these limits should generally be sufficient as long as we do not unnecessarily log very large model files or datasets.
-
-\---
-
-**# 2. First-Time Setup**
-Each collaborator performs these steps once.
-
-**## Clone the Repository**
-
-\`\`\`bash
-
-git clone https\://github.com/maxedmonds07/CS7267-LLM-Injection-Defense.git
-
-\`\`\`
+```bash
+git clone https://github.com/maxedmonds07/CS7267-LLM-Injection-Defense.git
+```
 
 Enter the repository:
 
-\`\`\`bash
-
+```bash
 cd CS7267-LLM-Injection-Defense
+```
 
-\`\`\`
+Enter the MLflow server folder:
 
-Enter:
-
-\`\`\`bash
-
+```bash
 cd mlflow-server
+```
 
-\`\`\`
+---
 
-\---
+## 2.2 Create a Virtual Environment
 
-**# 3. Create a Virtual Environment**
-**## Windows**
+### Windows
 
-\`\`\`powershell
-
+```powershell
 python -m venv .venv
+```
 
-\`\`\`
+Activate it:
 
-Activate:
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-\`\`\`powershell
+If PowerShell blocks script execution, run:
 
-.\\.venv\Scripts\Activate.ps1
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
 
-\`\`\`
+Then activate again:
 
-\---
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-**## macOS / Linux**
+### macOS / Linux
 
-\`\`\`bash
-
+```bash
 python3 -m venv .venv
+```
 
-\`\`\`
+Activate it:
 
-Activate:
-
-\`\`\`bash
-
+```bash
 source .venv/bin/activate
+```
 
-\`\`\`
+---
 
-\---
+## 2.3 Install MLflow Requirements
 
-**# 4. Install MLflow Requirements**
-\`\`\`bash
-
+```bash
 pip install -r requirements.txt
+```
 
-\`\`\`
+The project uses the same `requirements.txt` so that all collaborators use compatible MLflow versions.
 
-The project uses the same requirements file so team members use compatible MLflow versions.
+Do not independently upgrade MLflow unless the change is made through the repository's `requirements.txt`.
 
-Do not independently upgrade MLflow unless the change is made through the repository's \`requirements.txt\`.
+---
 
-\---
+## 2.4 Configure the `.env` File
 
-**# 5. Configure the \`.env\` File**
-Each team member needs:
+Each team member needs a local:
 
-\`\`\`text
-
+```text
 mlflow-server/.env
-
-\`\`\`
+```
 
 Copy:
 
-\`\`\`text
-
+```text
 .env.example
-
-\`\`\`
-
-and populate it with the shared credentials supplied by the project owner.
-
-Required settings include:
-
-\`\`\`text
-
-DATABASE_URL
-
-MLFLOW_ARTIFACT_BUCKET
-
-AWS_ACCESS_KEY_ID
-
-AWS_SECRET_ACCESS_KEY
-
-MLFLOW_S3_ENDPOINT_URL
-
-\`\`\`
-
-All team members use the same:
-
-\`\`\`text
-
-Neon PostgreSQL database
-
-Neon Object Storage bucket
-
-\`\`\`
-
-This is what makes MLflow collaborative.
-
-\---
-
-**# 6. Never Commit \`.env\`**
-The \`.env\` file contains credentials and must never be pushed to GitHub.
-
-Make sure:
-
-\`\`\`text
-
-.env
-
-\`\`\`
-
-is listed in \`.gitignore\`.
-
-Never place database passwords or storage credentials inside:
-
-\`\`\`text
-
-Python scripts
-
-Jupyter notebooks
-
-README files
-
-Git commits
-
-Pull Requests
-
-GitHub Issues
-
-\`\`\`
-
-\---
-
-**# 7. Starting MLflow**
-Every time you want to work with MLflow:
-
-**### Step 1**
-
-Open a terminal.
-
-**### Step 2**
-
-Enter:
-
-\`\`\`bash
-
-cd mlflow-server
-
-\`\`\`
-
-**### Step 3**
-
-Activate the virtual environment.
-
-Windows:
-
-\`\`\`powershell
-
-.\\.venv\Scripts\Activate.ps1
-
-\`\`\`
-
-macOS/Linux:
-
-\`\`\`bash
-
-source .venv/bin/activate
-
-\`\`\`
-
-**### Step 4**
-
-Start MLflow:
-
-\`\`\`bash
-
-python start_mlflow\.py
-
-\`\`\`
-
-**### Step 5**
-
-Open:
-
-\`\`\`text
-
-http\://127.0.0.1:5000
-
-\`\`\`
-
-Keep the MLflow terminal open while running experiments.
-
-\---
-
-**# 8. What Each Component Does**
-**## GitHub**
-
-GitHub tracks our **\*\*code\*\***.
-
-Examples:
-
-\`\`\`text
-
-Python scripts
-
-Jupyter notebooks
-
-Model implementations
-
-Preprocessing code
-
-Configuration
-
-Documentation
-
-Requirements
-
-\`\`\`
-
-GitHub provides:
-
-\`\`\`text
-
-Branches
-
-Commits
-
-Pull Requests
-
-Merge history
-
-Version control
-
-\`\`\`
-
-\---
-
-**## MLflow**
-
-MLflow tracks our **\*\*machine-learning experiments\*\***.
-
-Examples:
-
-\`\`\`text
-
-Model name
-
-Hyperparameters
-
-Accuracy
-
-Precision
-
-Recall
-
-F1-score
-
-AUROC
-
-Training configuration
-
-Git commit
-
-Git branch
-
-Plots
-
-Model files
-
-Other artifacts
-
-\`\`\`
-
-MLflow allows us to answer questions such as:
-
-\`\`\`text
-
-Which model performed best?
-
-What hyperparameters were used?
-
-Who ran this experiment?
-
-Which version of the code produced this result?
-
-What metrics did a previous experiment achieve?
-
-\`\`\`
-
-\---
-
-**## Neon PostgreSQL**
-
-Neon PostgreSQL is the shared database behind MLflow.
-
-It contains MLflow metadata such as:
-
-\`\`\`text
-
-Experiments
-
-Runs
-
-Parameters
-
-Metrics
-
-Tags
-
-Run status
-
-Model metadata
-
-Artifact locations
-
-\`\`\`
-
-Every team member connects their local MLflow server to the **\*\*same database\*\***.
-
-That is why everyone can see the same experiments.
-
-\---
-
-**## Neon Object Storage**
-
-Neon Object Storage stores MLflow files and artifacts.
-
-Examples:
-
-\`\`\`text
-
-Trained models
-
-Confusion matrices
-
-ROC curves
-
-PR curves
-
-SHAP plots
-
-Feature-importance plots
-
-Classification reports
-
-CSV files
-
-JSON files
-
-Other experiment artifacts
-
-\`\`\`
-
-All team members use the same object-storage bucket.
-
-\---
-
-**# 9. How MLflow Actually Works**
-An important point:
-
-**## MLflow does NOT automatically track GitHub activity.**
-
-The following:
-
-\`\`\`text
-
-git add
-
-git commit
-
-git push
-
-Pull Request
-
-Merge to main
-
-\`\`\`
-
-does **\*\*not\*\*** automatically create an MLflow experiment or run.
-
-MLflow records information only when your Python code actually communicates with MLflow.
+```
+
+and populate it with the credentials supplied by the project owner.
+
+The required settings are:
+
+```text
+DATABASE_URL=
+MLFLOW_ARTIFACT_BUCKET=
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+MLFLOW_S3_ENDPOINT_URL=
+MLFLOW_TEAM_MEMBER=
+```
+
+Example:
+
+```text
+DATABASE_URL=your_neon_database_url
+MLFLOW_ARTIFACT_BUCKET=your_bucket_name
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+MLFLOW_S3_ENDPOINT_URL=your_storage_endpoint
+MLFLOW_TEAM_MEMBER=YourName
+```
+
+The Neon database and storage credentials are shared by the team.
+
+`MLFLOW_TEAM_MEMBER` identifies which collaborator created a particular MLflow run.
 
 For example:
 
-\`\`\`python
-
-import mlflow
-
-mlflow\.set_tracking_uri("http\://127.0.0.1:5000")
-
-mlflow\.set_experiment("baseline_models")
-
-with mlflow\.start_run():
-
-    mlflow\.log_param(
-
-        "model",
-
-        "RandomForest"
-
-    )
-
-    mlflow\.log_param(
-
-        "n_estimators",
-
-        200
-
-    )
-
-    mlflow\.log_metric(
-
-        "accuracy",
-
-        0.91
-
-    )
-
-\`\`\`
-
-When this code executes:
-
-\`\`\`text
-
-Training Script
-
-       |
-
-       v
-
-Local MLflow Server
-
-127.0.0.1:5000
-
-       |
-
-       v
-
-Neon PostgreSQL
-
-       |
-
-       +---- parameters
-
-       +---- metrics
-
-       +---- experiment
-
-       +---- run information
-
-\`\`\`
-
-If artifacts are logged:
-
-\`\`\`python
-
-mlflow\.log_artifact(
-
-    "confusion_matrix.png"
-
-)
-
-\`\`\`
-
-the flow is:
-
-\`\`\`text
-
-Training Script
-
-       |
-
-       v
-
-Local MLflow Server
-
-       |
-
-       v
-
-Neon Object Storage
-
-\`\`\`
-
-\---
-
-**# 10. Do I Need to Run the MLflow Server Every Time?**
-**## Yes, when you are actively logging or viewing MLflow data.**
-
-Before running code that contains:
-
-\`\`\`python
-
-mlflow\.start_run()
-
-mlflow\.log_param()
-
-mlflow\.log_metric()
-
-mlflow\.log_artifact()
-
-mlflow\.sklearn.log_model()
-
-\`\`\`
-
-start your local MLflow server.
-
-From:
-
-\`\`\`text
-
-mlflow-server/
-
-\`\`\`
-
-run:
-
-\`\`\`bash
-
-python start_mlflow\.py
-
-\`\`\`
-
-Keep that terminal open while you are running experiments.
-
-Your training code communicates with:
-
-\`\`\`text
-
-http\://127.0.0.1:5000
-
-\`\`\`
-
-\---
-
-**## You do NOT need to leave the server running continuously.**
-
-Once an experiment has been logged:
-
-\`\`\`text
-
-Experiment
-
-    |
-
-    v
-
-Neon database / storage
-
-\`\`\`
-
-the information is persistent.
-
-You can stop MLflow using:
-
-\`\`\`text
-
-Ctrl + C
-
-\`\`\`
-
-Nothing is deleted.
-
-Later, run:
-
-\`\`\`bash
-
-python start_mlflow\.py
-
-\`\`\`
-
-again.
-
-Open:
-
-\`\`\`text
-
-http\://127.0.0.1:5000
-
-\`\`\`
-
-and all previously logged experiments will appear again.
-
-\---
-
-**# 11. What Happens If I Train a Model Without Starting MLflow?**
-Suppose you run:
-
-\`\`\`python
-
-model.fit(X_train, y_train)
-
-\`\`\`
-
-but you never start MLflow or never execute MLflow logging commands.
-
-The model can still train normally.
-
-However:
-
-\`\`\`text
-
-Model training        YES
-
-Git code              unchanged
-
-MLflow experiment     NO
-
-MLflow metrics        NO
-
-MLflow parameters     NO
-
-\`\`\`
-
-MLflow does not automatically discover models that were trained elsewhere.
-
-Therefore, if an experiment is important and should be available to the team, run it while MLflow is configured and log the relevant information.
-
-\---
-
-**# 12. Relationship Between Git Branches and MLflow**
-Git branches and MLflow experiments are independent.
-
-For example:
-
-\`\`\`text
-
-Developer working on a branch
-
-            |
-
-            v
-
-Runs model
-
-            |
-
-            v
-
-Logs experiment to MLflow
-
-            |
-
-            v
-
-Shared Neon database
-
-\`\`\`
-
-That experiment immediately becomes available to the rest of the team.
-
-The code does **\*\*not\*\*** need to be merged into \`main\` before the experiment can be logged.
-
-Likewise, merging code into \`main\` does not automatically create an MLflow run.
-
-\---
-
-**# 13. What Happens When Code Is Merged Into \`main\`?**
-Suppose a developer:
-
-\`\`\`text
-
-1\. Develops Model A
-
-2\. Runs Model A
-
-3\. Logs Model A to MLflow
-
-4\. Commits the code
-
-5\. Opens a Pull Request
-
-6\. Merges the code into main
-
-\`\`\`
-
-The MLflow experiment created in Step 3 remains exactly where it is.
-
-The Git merge does not move or duplicate the experiment.
-
-Conceptually:
-
-\`\`\`text
-
-                        GitHub
-
-                          |
-
-Feature code ------------+
-
-                          |
-
-                          v
-
-                         main
-
-                       MLflow
-
-                          |
-
-                          v
-
-                    Existing Run A
-
-                    Existing Run B
-
-                    Existing Run C
-
-\`\`\`
-
-These systems are separate.
-
-\---
-
-**# 14. Does MLflow Show Only Models From \`main\`?**
-**## No.**
-
-By default, MLflow shows **\*\*all runs stored in the shared Neon database\*\***.
-
-That can include experiments performed from:
-
-\`\`\`text
-
-Development branches
-
-Feature branches
-
-main
-
-Old experiments
-
-Failed experiments
-
-Hyperparameter trials
-
-Final experiments
-
-\`\`\`
-
-MLflow does not automatically decide:
-
-\> This code is now merged into main, therefore only show this model.
-
-Instead, we should identify where important runs came from using tags.
-
-\---
-
-**# 15. Recommended Workflow**
-A good workflow for this project is:
-
-\`\`\`text
-
-Developer writes/changes model code
-
-             |
-
-             v
-
-Start local MLflow server
-
-             |
-
-             v
-
-Run experiment
-
-             |
-
-             v
-
-Log metrics/parameters/artifacts
-
-             |
-
-             v
-
-Compare results in MLflow
-
-             |
-
-             v
-
-Commit + push code
-
-             |
-
-             v
-
-Pull Request
-
-             |
-
-             v
-
-Merge approved code into main
-
-\`\`\`
-
-After a model has been accepted into \`main\`, we can optionally run the accepted model **\*\*once again from \`main\`\*\***.
-
-That gives us a clean final MLflow run representing the actual code currently in \`main\`.
-
-Recommended final workflow:
-
-\`\`\`text
-
-Development run
-
-      |
-
-      v
-
-MLflow comparison
-
-      |
-
-      v
-
-Choose model
-
-      |
-
-      v
-
-Merge code into main
-
-      |
-
-      v
-
-Run model from main
-
-      |
-
-      v
-
-Create final MLflow run
-
-\`\`\`
-
-This final run can be tagged:
-
-\`\`\`text
-
-source_branch = main
-
-model_status = final
-
-\`\`\`
-
-That makes it easy to distinguish final/accepted models from experimental models.
-
-\---
-
-**# 16. Recommended Git Information to Log**
-Every important MLflow run should include:
-
-\`\`\`text
-
-Git branch
-
-Git commit
-
-Team member
-
-\`\`\`
-
-This makes experiments reproducible.
-
-For example:
-
-\`\`\`python
-
-import subprocess
-
-import mlflow
-
-branch = subprocess.check_output(
-
-    ["git", "branch", "--show-current"],
-
-    text=True
-
-).strip()
-
-commit = subprocess.check_output(
-
-    ["git", "rev-parse", "HEAD"],
-
-    text=True
-
-).strip()
-
-with mlflow\.start_run():
-
-    mlflow\.set_tag(
-
-        "git_branch",
-
-        branch
-
-    )
-
-    mlflow\.set_tag(
-
-        "git_commit",
-
-        commit
-
-    )
-
-\`\`\`
-
-The resulting MLflow run could contain:
-
-\`\`\`text
-
-Run:
-
-random_forest_v3
-
-Model:
-
-RandomForest
-
-Accuracy:
-
-0.91
-
-F1:
-
-0.89
-
-git_branch:
-
-feature/model-development
-
-git_commit:
-
-7d248fe...
-
-team_member:
-
-Member 2
-
-\`\`\`
-
-After code is merged and rerun from \`main\`:
-
-\`\`\`text
-
-git_branch:
-
-main
-
-git_commit:
-
-85a2fb4...
-
-model_status:
-
-final
-
-\`\`\`
-
-\---
-
-**# 17. Connecting Training Code to MLflow**
-Your training code should contain:
-
-\`\`\`python
-
-import mlflow
-
-mlflow\.set_tracking_uri(
-
-    "http\://127.0.0.1:5000"
-
-)
-
-\`\`\`
-
-Then select or create an experiment:
-
-\`\`\`python
-
-mlflow\.set_experiment(
-
-    "baseline_models"
-
-)
-
-\`\`\`
-
-\---
-
-**# 18. Example Run**
-\`\`\`python
-
-import mlflow
-
-mlflow\.set_tracking_uri(
-
-    "http\://127.0.0.1:5000"
-
-)
-
-mlflow\.set_experiment(
-
-    "baseline_models"
-
-)
-
-with mlflow\.start_run(
-
-    run_name="random_forest_baseline"
-
-):
-
-    mlflow\.log_param(
-
-        "model",
-
-        "RandomForest"
-
-    )
-
-    mlflow\.log_param(
-
-        "n_estimators",
-
-        200
-
-    )
-
-    mlflow\.log_param(
-
-        "max_depth",
-
-        10
-
-    )
-
-    mlflow\.log_metric(
-
-        "accuracy",
-
-        0.91
-
-    )
-
-    mlflow\.log_metric(
-
-        "f1_macro",
-
-        0.89
-
-    )
-
-\`\`\`
-
-Refresh:
-
-\`\`\`text
-
-http\://127.0.0.1:5000
-
-\`\`\`
-
-and the run should appear.
-
-Because it is stored in Neon, other collaborators will also see it when they start their own local MLflow servers.
-
-\---
-
-**# 19. Logging Artifacts**
-For example:
-
-\`\`\`python
-
-mlflow\.log_artifact(
-
-    "confusion_matrix.png"
-
-)
-
-\`\`\`
+```text
+MLFLOW_TEAM_MEMBER=Alice
+```
 
 or:
 
-\`\`\`python
+```text
+MLFLOW_TEAM_MEMBER=Bob
+```
 
-mlflow\.log_artifact(
+---
 
-    "classification_report.csv"
+## 2.5 Never Commit `.env`
 
-)
+The `.env` file contains credentials and must never be pushed to GitHub.
 
-\`\`\`
+Make sure `.gitignore` contains:
 
-The file is sent:
+```gitignore
+.env
+```
 
-\`\`\`text
+Never put database passwords, storage credentials, or access keys inside:
 
-Training code
+- Python scripts
+- Jupyter notebooks
+- README files
+- Git commits
+- Pull Requests
+- GitHub Issues
 
-      |
+---
 
-      v
+## 2.6 Start the MLflow Server
 
-Local MLflow Server
+Every time you want to use MLflow, open a terminal and enter:
 
-      |
+```bash
+cd mlflow-server
+```
 
-      v
+Activate the virtual environment.
 
-Neon Object Storage
+### Windows
 
-\`\`\`
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-Other team members can then access it from their MLflow UI.
+### macOS / Linux
 
-\---
+```bash
+source .venv/bin/activate
+```
 
-**# 20. Logging Models**
-Example for Scikit-Learn:
+Start MLflow:
 
-\`\`\`python
+```bash
+python start_mlflow.py
+```
 
-import mlflow\.sklearn
+Open:
 
-mlflow\.sklearn.log_model(
+```text
+http://127.0.0.1:5000
+```
 
-    model,
+Keep this terminal open while running ML experiments.
 
-    name="model"
+To stop the server:
 
-)
+```text
+Ctrl + C
+```
 
-\`\`\`
+Stopping the server does **not** delete any experiments.
 
-The run metadata is stored in PostgreSQL while the model files are stored in Object Storage.
+The experiment information is already stored in Neon.
 
-\---
+---
 
-**# 21. Suggested Experiment Organization**
-Use clear experiment names rather than names such as:
+# 3. What Each Component Does
 
-\`\`\`text
+## GitHub
 
-test
+GitHub tracks our **source code**.
 
-test2
+Examples include:
 
-final
+- Python scripts
+- Jupyter notebooks
+- Model implementations
+- Preprocessing code
+- Configuration
+- Documentation
+- Requirements
 
-final2
+GitHub provides:
 
-\`\`\`
+- Branches
+- Commits
+- Pull Requests
+- Merge history
+- Version control
+
+GitHub answers:
+
+> What version of the code are we using?
+
+---
+
+## MLflow
+
+MLflow tracks our **machine-learning experiments**.
+
+Examples include:
+
+- Model type
+- Hyperparameters
+- Accuracy
+- Precision
+- Recall
+- F1-score
+- AUROC
+- Training configuration
+- Git commit
+- Git branch
+- Team member
+- Plots
+- Model files
+- Other artifacts
+
+MLflow helps answer questions such as:
+
+> What experiments did we run?
+
+> What parameters were used?
+
+> What metrics did each run produce?
+
+> Who ran the experiment?
+
+> Which Git commit produced the result?
+
+---
+
+## Neon PostgreSQL
+
+Neon PostgreSQL is the shared backend database used by MLflow.
+
+It stores information such as:
+
+```text
+Experiments
+Runs
+Parameters
+Metrics
+Tags
+Run status
+Model metadata
+Artifact locations
+```
+
+Every team member connects their local MLflow server to the **same database**.
+
+That is why all collaborators can see the same experiments.
+
+---
+
+## Neon Object Storage
+
+Neon Object Storage stores files associated with MLflow runs.
+
+Examples include:
+
+```text
+Trained models
+Confusion matrices
+ROC curves
+PR curves
+SHAP plots
+Feature importance plots
+Classification reports
+CSV files
+JSON files
+Other experiment artifacts
+```
+
+All collaborators use the same Object Storage bucket.
+
+---
+
+# 4. How MLflow Actually Works
+
+An important point:
+
+## MLflow does NOT automatically track GitHub activity
+
+The following commands do not automatically create an MLflow run:
+
+```text
+git add
+git commit
+git push
+Pull Request
+Merge to main
+```
+
+MLflow records information only when the Python program communicates with the MLflow tracking server.
 
 For example:
 
-\`\`\`text
+```python
+import mlflow
 
-data_preparation
+mlflow.set_tracking_uri("http://127.0.0.1:5000")
 
+mlflow.set_experiment("baseline_models")
+
+with mlflow.start_run():
+
+    mlflow.log_param(
+        "model",
+        "RandomForest"
+    )
+
+    mlflow.log_param(
+        "n_estimators",
+        200
+    )
+
+    mlflow.log_metric(
+        "accuracy",
+        0.91
+    )
+```
+
+When this code runs:
+
+```text
+Training Script
+       |
+       v
+Local MLflow Server
+127.0.0.1:5000
+       |
+       v
+Neon PostgreSQL
+       |
+       +---- Experiment
+       +---- Run
+       +---- Parameters
+       +---- Metrics
+       +---- Tags
+```
+
+If artifacts are logged:
+
+```python
+mlflow.log_artifact(
+    "confusion_matrix.png"
+)
+```
+
+the flow is:
+
+```text
+Training Script
+       |
+       v
+Local MLflow Server
+       |
+       v
+Neon Object Storage
+```
+
+---
+
+# 5. Experiments, Runs, Models, and Model Registry
+
+These terms have different meanings.
+
+```text
+Experiment
+    |
+    └── Run
+         |
+         ├── Parameters
+         ├── Metrics
+         ├── Tags
+         ├── Artifacts
+         |
+         └── Logged Model (optional)
+                  |
+                  v
+             Model Registry
+             (optional)
+```
+
+## Experiment
+
+An **experiment** groups related runs.
+
+Example:
+
+```text
 baseline_models
+```
 
+It might contain:
+
+```text
+Logistic Regression run
+Random Forest run
+XGBoost run
+```
+
+---
+
+## Run
+
+A **run** represents one execution of training/evaluation code.
+
+Example:
+
+```text
+random_forest_depth_10
+```
+
+It may contain:
+
+```text
+n_estimators = 200
+max_depth = 10
+accuracy = 0.91
+f1_macro = 0.89
+team_member = Alice
+git_branch = feature/random-forest
+```
+
+Running the same script again normally creates another run.
+
+MLflow does not overwrite the previous run.
+
+---
+
+## Logged Model
+
+A trained model is stored only when we explicitly tell MLflow to store it.
+
+Training:
+
+```python
+model.fit(X_train, y_train)
+```
+
+does **not** automatically save the model to MLflow.
+
+The model is stored when we use something such as:
+
+```python
+mlflow.sklearn.log_model(
+    sk_model=model,
+    name="model"
+)
+```
+
+Therefore:
+
+```text
+Train model
+      |
+      X
+Model is NOT automatically stored
+```
+
+but:
+
+```text
+Train model
+      |
+mlflow.sklearn.log_model(...)
+      |
+      v
+Model stored in Object Storage
+```
+
+---
+
+## Model Registry
+
+The Model Registry is used when we want to formally manage selected models.
+
+Example:
+
+```text
+PromptInjectionDetector
+
+Version 1
+Version 2
+Version 3
+```
+
+Not every experiment needs to be registered.
+
+For this project, we can use the registry mainly for selected or final models.
+
+---
+
+# 6. Do I Need to Run MLflow Every Time?
+
+## Yes, when you want MLflow tracking
+
+Before running code containing:
+
+```python
+mlflow.start_run()
+mlflow.log_param()
+mlflow.log_metric()
+mlflow.log_artifact()
+mlflow.sklearn.log_model()
+```
+
+the local MLflow server should be running.
+
+Start it with:
+
+```bash
+python start_mlflow.py
+```
+
+Your training code communicates with:
+
+```text
+http://127.0.0.1:5000
+```
+
+---
+
+## You do not need to leave MLflow running continuously
+
+Once an experiment is logged:
+
+```text
+Experiment
+    |
+    v
+Neon PostgreSQL / Object Storage
+```
+
+the information remains stored.
+
+You can stop the local MLflow server.
+
+Later:
+
+```bash
+python start_mlflow.py
+```
+
+and all previous experiments will appear again.
+
+---
+
+# 7. What Happens If I Train Without MLflow?
+
+This:
+
+```python
+model.fit(X_train, y_train)
+```
+
+works normally even if MLflow is not running.
+
+However:
+
+```text
+Model training        YES
+MLflow experiment     NO
+MLflow metrics        NO
+MLflow parameters     NO
+MLflow artifacts      NO
+```
+
+MLflow does not automatically discover models that were trained outside MLflow tracking.
+
+---
+
+# 8. Relationship Between Git Branches and MLflow
+
+Git branches and MLflow are independent.
+
+A developer can work on a feature branch:
+
+```text
+Feature branch
+      |
+      v
+Develop model
+      |
+      v
+Run model
+      |
+      v
+Log MLflow experiment
+      |
+      v
+Shared Neon database
+```
+
+The experiment becomes available to the team immediately.
+
+The branch does **not** need to be merged into `main` first.
+
+Likewise:
+
+```text
+Merge into main
+```
+
+does not automatically create an MLflow run.
+
+---
+
+# 9. What Happens When Code Is Merged Into `main`?
+
+Suppose someone:
+
+```text
+1. Develops Model A
+2. Starts MLflow
+3. Runs Model A
+4. Logs the experiment
+5. Commits the code
+6. Creates a Pull Request
+7. Merges the code into main
+```
+
+The original MLflow run remains unchanged.
+
+GitHub:
+
+```text
+Feature branch
+      |
+      v
+Pull Request
+      |
+      v
+main
+```
+
+MLflow:
+
+```text
+Experiment
+    |
+    └── Existing development run
+```
+
+The Git merge does not move, delete, or recreate that MLflow run.
+
+---
+
+# 10. Does MLflow Show Only Models From `main`?
+
+No.
+
+MLflow displays all runs stored in the shared database.
+
+This may include:
+
+```text
+Development runs
+Feature branch runs
+Main branch runs
+Hyperparameter trials
+Failed experiments
+Final experiments
+```
+
+We therefore use tags to identify where runs came from.
+
+Example:
+
+```text
+git_branch = feature/random-forest
+git_commit = abc123
+team_member = Alice
+model_status = development
+```
+
+A final run could contain:
+
+```text
+git_branch = main
+git_commit = def456
+model_status = final
+```
+
+---
+
+# 11. Recommended Project Workflow
+
+A recommended workflow is:
+
+```text
+Developer creates/changes model
+             |
+             v
+Start local MLflow server
+             |
+             v
+Run experiment
+             |
+             v
+Log parameters + metrics
+             |
+             v
+Compare results in MLflow
+             |
+             v
+Commit + push code
+             |
+             v
+Pull Request
+             |
+             v
+Merge approved code into main
+```
+
+For important/final models:
+
+```text
+Development experiments
+        |
+        v
+Compare models
+        |
+        v
+Choose approach
+        |
+        v
+Merge into main
+        |
+        v
+Pull latest main
+        |
+        v
+Run final model again
+        |
+        v
+Log final MLflow run
+        |
+        v
+Store actual trained model
+```
+
+This gives us a clean distinction:
+
+```text
+Development runs
+=
+experimentation and comparison
+
+Main/final run
+=
+accepted project implementation
+```
+
+---
+
+# 12. What Should Be Logged During Development?
+
+For most experiments, log:
+
+```text
+Parameters
+Metrics
+Git branch
+Git commit
+Team member
+Useful plots
+Useful reports
+```
+
+Example:
+
+```python
+mlflow.log_params({
+    "model": "RandomForest",
+    "n_estimators": 200,
+    "max_depth": 10
+})
+
+mlflow.log_metrics({
+    "accuracy": 0.91,
+    "f1_macro": 0.89
+})
+```
+
+We do **not** need to save the actual trained model for every experiment.
+
+---
+
+# 13. When Should We Store the Actual Model?
+
+Recommended policy:
+
+```text
+Development experiment
+→ Parameters ✅
+→ Metrics ✅
+→ Tags ✅
+→ Useful artifacts ✅
+→ Model file usually NO
+
+
+Selected/final model
+→ Parameters ✅
+→ Metrics ✅
+→ Tags ✅
+→ Artifacts ✅
+→ Actual model ✅
+```
+
+This prevents unnecessary Object Storage usage.
+
+Example:
+
+```python
+mlflow.sklearn.log_model(
+    sk_model=model,
+    name="model"
+)
+```
+
+Only use this when the trained model itself should be preserved.
+
+---
+
+# 14. Recommended Git Information to Log
+
+Important runs should include:
+
+```text
+Git branch
+Git commit
+Team member
+```
+
+Example:
+
+```python
+import subprocess
+import mlflow
+
+
+branch = subprocess.check_output(
+    ["git", "branch", "--show-current"],
+    text=True
+).strip()
+
+
+commit = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"],
+    text=True
+).strip()
+
+
+with mlflow.start_run():
+
+    mlflow.set_tags({
+        "git_branch": branch,
+        "git_commit": commit
+    })
+```
+
+A run could then show:
+
+```text
+Run:
+random_forest_v3
+
+Model:
+RandomForest
+
+Accuracy:
+0.91
+
+F1:
+0.89
+
+team_member:
+Alice
+
+git_branch:
+feature/model-development
+
+git_commit:
+7d248fe
+```
+
+---
+
+# 15. Team Member Identification
+
+Each collaborator should set:
+
+```text
+MLFLOW_TEAM_MEMBER=
+```
+
+inside their local `.env`.
+
+Example:
+
+```text
+MLFLOW_TEAM_MEMBER=Alice
+```
+
+Then training code can use:
+
+```python
+import os
+
+team_member = os.getenv(
+    "MLFLOW_TEAM_MEMBER",
+    "unknown"
+)
+
+mlflow.set_tag(
+    "team_member",
+    team_member
+)
+```
+
+This allows MLflow runs to identify who performed the experiment.
+
+Example:
+
+```text
+Run                  Team Member
+---------------------------------
+random_forest_v1     Alice
+xgboost_v1           Bob
+logistic_v2          Carol
+```
+
+---
+
+# 16. Connecting Training Code to MLflow
+
+Add:
+
+```python
+import mlflow
+
+mlflow.set_tracking_uri(
+    "http://127.0.0.1:5000"
+)
+```
+
+Then select or create an experiment:
+
+```python
+mlflow.set_experiment(
+    "baseline_models"
+)
+```
+
+---
+
+# 17. Example Run
+
+```python
+import mlflow
+
+mlflow.set_tracking_uri(
+    "http://127.0.0.1:5000"
+)
+
+mlflow.set_experiment(
+    "baseline_models"
+)
+
+with mlflow.start_run(
+    run_name="random_forest_baseline"
+):
+
+    mlflow.log_param(
+        "model",
+        "RandomForest"
+    )
+
+    mlflow.log_param(
+        "n_estimators",
+        200
+    )
+
+    mlflow.log_param(
+        "max_depth",
+        10
+    )
+
+    mlflow.log_metric(
+        "accuracy",
+        0.91
+    )
+
+    mlflow.log_metric(
+        "f1_macro",
+        0.89
+    )
+```
+
+After running, refresh:
+
+```text
+http://127.0.0.1:5000
+```
+
+The run should appear.
+
+Because it is stored in Neon, other collaborators will also see it when they start their own MLflow servers.
+
+---
+
+# 18. Logging Artifacts
+
+Artifacts are files associated with a run.
+
+Examples:
+
+```python
+mlflow.log_artifact(
+    "confusion_matrix.png"
+)
+```
+
+```python
+mlflow.log_artifact(
+    "classification_report.csv"
+)
+```
+
+The flow is:
+
+```text
+Training code
+      |
+      v
+Local MLflow Server
+      |
+      v
+Neon Object Storage
+```
+
+---
+
+# 19. Logging Models
+
+For Scikit-Learn:
+
+```python
+import mlflow.sklearn
+
+mlflow.sklearn.log_model(
+    sk_model=model,
+    name="model"
+)
+```
+
+The run metadata is stored in PostgreSQL.
+
+The actual trained model files are stored in Object Storage.
+
+---
+
+# 20. Suggested Experiment Organization
+
+Use meaningful experiment names.
+
+Avoid:
+
+```text
+test
+test2
+final
+final2
+new
+final_final
+```
+
+Prefer names such as:
+
+```text
+data_preparation
+baseline_models
 feature_engineering
-
 prompt_injection_detection
-
 hyperparameter_tuning
-
 model_comparison
-
 final_models
+```
 
-\`\`\`
+---
 
-\---
+# 21. Example MLflow Structure
 
-**# 22. Important Team Rules**
-**### Rule 1**
+Suppose three collaborators are testing models.
+
+```text
+Experiment: baseline_models
+
+├── Run: logistic_regression
+│   ├── team_member = Alice
+│   ├── accuracy = 0.84
+│   └── f1_macro = 0.82
+│
+├── Run: random_forest
+│   ├── team_member = Bob
+│   ├── accuracy = 0.90
+│   └── f1_macro = 0.88
+│
+└── Run: xgboost
+    ├── team_member = Carol
+    ├── accuracy = 0.93
+    └── f1_macro = 0.92
+```
+
+These development runs do not necessarily need to store trained model files.
+
+After one approach is selected:
+
+```text
+Experiment: final_models
+
+└── Run: final_model
+    ├── git_branch = main
+    ├── model_status = final
+    ├── metrics
+    ├── parameters
+    │
+    └── Stored Model
+```
+
+---
+
+# 22. Deleting Experiments and Models
+
+Deleting an experiment from the MLflow UI initially performs a logical/soft deletion.
+
+Do not manually delete MLflow rows directly from Neon PostgreSQL.
+
+Do not manually remove MLflow artifact directories from Object Storage.
+
+Use MLflow's deletion and garbage-collection mechanisms.
+
+For team safety:
+
+> Do not permanently delete shared experiments or models without discussing it with the team first.
+
+---
+
+# 23. Important Team Rules
+
+### Rule 1
 
 Start MLflow before running an experiment that should be tracked.
 
-**### Rule 2**
+### Rule 2
 
 A Git push does not create an MLflow run.
 
-**### Rule 3**
+### Rule 3
 
-A merge into \`main\` does not create or update an MLflow run.
+A merge into `main` does not automatically create or update an MLflow run.
 
-**### Rule 4**
+### Rule 4
 
-Experiments performed on development branches can still appear in the shared MLflow UI.
+Experiments from development branches can appear in the shared MLflow UI.
 
-**### Rule 5**
+### Rule 5
 
-Tag important runs with their Git branch and Git commit.
+Tag important runs with the Git branch and Git commit.
 
-**### Rule 6**
+### Rule 6
 
-After an important model is merged into \`main\`, preferably run it again from \`main\` and record that as the final/accepted run.
+Use `MLFLOW_TEAM_MEMBER` to identify who performed a run.
 
-**### Rule 7**
+### Rule 7
 
-Do not delete shared MLflow experiments or models without discussing it with the team.
+Do not save every development model unnecessarily.
 
-**### Rule 8**
+### Rule 8
 
-Never commit Neon credentials or the \`.env\` file.
+Prefer storing trained model files for selected or final models.
 
-\---
+### Rule 9
 
-**# 23. Typical Development Example**
-Suppose a team member develops a new model.
+After an important implementation is merged into `main`, preferably rerun it from `main` and log the accepted/final run.
 
-\`\`\`text
+### Rule 10
 
-1\. Start local MLflow
+Never commit `.env` or Neon credentials.
 
-2\. Develop/train model
+### Rule 11
 
-3\. Log experiment to MLflow
+Do not delete shared experiments or models without discussing it with the team.
 
-4\. Compare metrics with existing experiments
+---
 
-5\. Commit model code
+# 24. Typical Development Example
 
-6\. Push code to GitHub
+A typical workflow is:
 
-7\. Create Pull Request
+```text
+1. Pull latest code
 
-8\. Merge approved code into main
+2. Create or switch to your development branch
 
-9\. Pull latest main
+3. Start local MLflow
 
-10\. Optionally rerun the accepted model from main
+4. Develop/train model
 
-11\. Log the main run as the final model
+5. Log experiment to MLflow
 
-\`\`\`
+6. Compare metrics with existing experiments
 
-The final experiment could contain:
+7. Commit code
 
-\`\`\`text
+8. Push code
 
+9. Create Pull Request
+
+10. Merge approved code into main
+
+11. Pull latest main
+
+12. Rerun selected model from main
+
+13. Log final run
+
+14. Store final model if required
+```
+
+A final run might contain:
+
+```text
 model = RandomForest
 
 accuracy = 0.91
@@ -1395,158 +1349,140 @@ f1_macro = 0.89
 
 git_branch = main
 
-git_commit = 93ad281...
+git_commit = 93ad281
 
 model_status = final
+```
 
-\`\`\`
+This gives us:
 
-This gives us both:
-
-\`\`\`text
-
+```text
 GitHub
-
-→ authoritative final code
+→ authoritative source code
 
 MLflow
+→ experiment history and model results
+```
 
-→ authoritative experiment/model results
+---
 
-\`\`\`
+# 25. Daily Quick Start
 
-\---
-
-**# 24. Daily Quick Start**
 For normal work:
 
-\`\`\`bash
-
+```bash
 git pull
-
-\`\`\`
+```
 
 Then:
 
-\`\`\`bash
-
+```bash
 cd mlflow-server
+```
 
-\`\`\`
+Activate the environment.
 
-Activate the environment:
+### Windows
 
-**### Windows**
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-\`\`\`powershell
+### macOS / Linux
 
-.\\.venv\Scripts\Activate.ps1
-
-\`\`\`
-
-**### macOS/Linux**
-
-\`\`\`bash
-
+```bash
 source .venv/bin/activate
+```
 
-\`\`\`
+Start MLflow:
 
-Start:
-
-\`\`\`bash
-
-python start_mlflow\.py
-
-\`\`\`
+```bash
+python start_mlflow.py
+```
 
 Open:
 
-\`\`\`text
+```text
+http://127.0.0.1:5000
+```
 
-http\://127.0.0.1:5000
+Then run training code that uses:
 
-\`\`\`
-
-Then run training code that points to:
-
-\`\`\`python
-
-mlflow\.set_tracking_uri(
-
-    "http\://127.0.0.1:5000"
-
+```python
+mlflow.set_tracking_uri(
+    "http://127.0.0.1:5000"
 )
-
-\`\`\`
+```
 
 When finished:
 
-\`\`\`text
-
+```text
 Ctrl + C
+```
 
-\`\`\`
+The local MLflow server stops, but the shared experiment information remains stored in Neon.
 
-The server stops, but all shared MLflow data remains safely stored in Neon.
+---
 
-\---
+# 26. Final Mental Model
 
-**# 25. Final Mental Model**
-The easiest way to understand our setup is:
+The easiest way to understand the system is:
 
-\`\`\`text
-
+```text
 GitHub
-
-\=
-
+=
 Where is the code?
 
+
 MLflow
-
-\=
-
+=
 What happened when we ran the code?
 
+
 Neon PostgreSQL
+=
+Shared experiment metadata
 
-\=
-
-Shared experiment records
 
 Neon Object Storage
+=
+Shared models and artifact files
+```
 
-\=
+Most importantly:
 
-Shared model/artifact files
-
-\`\`\`
-
-And most importantly:
-
-\`\`\`text
-
+```text
 Git push
-
-        X
-
-        |
-
-        v
-
+    |
+    X
 Does NOT automatically update MLflow
+```
 
-Running code with MLflow logging
+but:
 
-        |
+```text
+Run code with MLflow logging
+             |
+             v
+        Updates MLflow
+```
 
-        v
+And:
 
-DOES update MLflow
+```text
+model.fit(...)
+      |
+      X
+Does NOT automatically store the model
+```
 
-\`\`\`
+while:
 
-The local MLflow server only needs to be running while you are actively using MLflow.
+```text
+mlflow.sklearn.log_model(...)
+             |
+             v
+Stores the trained model
+```
 
-Because all persistent data lives in Neon, each collaborator can stop and restart their local MLflow server whenever needed without losing shared experiment history.
+Each collaborator runs MLflow locally, while all persistent experiment information is shared through Neon.
