@@ -1,0 +1,20 @@
+ML flow performs only soft deletion it doesnt permanently delete from the backend dataset. 
+in order to permanently delete an experiment with its models you could do following from backend database
+
+first delete the experiemnt from the ml flow ui
+
+find experiment
+
+experiment = mlflow.set_experiment("MLflow_Example")
+
+print(experiment.experiment_id)
+
+run for hard delete:
+
+$env:MLFLOW_TRACKING_URI="http://127.0.0.1:5000"
+
+mlflow gc `
+  --experiment-ids "<EXPERIMENT_ID>" `
+  --backend-store-uri "<YOUR_NEON_DATABASE_URL>"
+  
+Note: this deletes all the whole experiments from database but does not delete artifacts from bucket for that we have to manually do it.
