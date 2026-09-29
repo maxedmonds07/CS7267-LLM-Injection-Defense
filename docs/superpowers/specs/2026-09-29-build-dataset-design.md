@@ -57,7 +57,9 @@ are null; `id` is unique; a `group` never spans two splits.
   `results/adv_targeted_results/{nq,msmarco,hotpotqa}.json` (3 × 100 × 5 = 1,500).
 - **Benign:** the top-`poisonedrag_benign_top_k` (default 10) passages from
   `results/beir_results/{subset}-contriever.json` for the same question, text from
-  `beir/{subset}/corpus.jsonl` (title and text joined as the retriever sees them). ~3,000.
+  `beir/{subset}/corpus.jsonl`. Passage `text` only, no title: PoisonedRAG feeds the LLM
+  `corpus[id]["text"]`, and its adversarial texts have no title, so adding titles to benign
+  rows only would hand the detector a formatting shortcut. ~3,000.
 - `group` = `{subset}:{question id}`.
 
 ### BIPIA → `tool_output`, `instruction`, role `train_pool`
@@ -67,12 +69,23 @@ are null; `id` is unique; a `group` never spans two splits.
 - **Adversarial:** for each context, `bipia_attacks_per_context` (default 1) attacks sampled
   with the seed from the matching attack file: `text_attack_{split}.json` for email, table,
   qa and abstract, `code_attack_{split}.json` for code. The attack is inserted at a sampled
-  position (start, middle, end) following BIPIA's own insertion code. ~3,100.
+  position (start, middle, end) following BIPIA's `bipia/data/utils.py`: `start` and `end`
+  join attack and context with `\n`; `middle` inserts at a sentence boundary chosen with
+  NLTK's `PunktSentenceTokenizer` (adds the `nltk` dependency; no model download needed).
+  Code contexts are BIPIA's `context` list joined with `\n`. ~3,100.
 - **Splits:** BIPIA's `train` contexts and attacks feed our `train`/`val` (val = 15% of
   train groups); BIPIA's `test` feeds our `test`. BIPIA's train and test attack categories
-  are disjoint, so our test measures unseen attack families.
+  are disjoint except `Language Translation` (different attack strings in each), so our test
+  mostly measures unseen attack families.
 - `group` = `{task}:{bipia split}:{context index}`, so a context's clean and injected
   versions share a split.
+
+### Tool-description text format
+
+Every `tool_description` row, from any source, is rendered as
+`Tool: {name}\nDescription: {description}`, the format MCPTox's own system prompts use.
+Tool names carry part of some attacks (MSB's `name_overlap`), and one shared format keeps
+the detector from telling sources apart by layout.
 
 ### MCPTox → `tool_description`, `instruction`, role `loso_holdout`
 
@@ -84,12 +97,27 @@ are null; `id` is unique; a `group` never spans two splits.
 
 ### MSB → `tool_description` and `tool_output`, `instruction`, role `transfer_holdout`
 
-- **Descriptions:** tool docstrings from the attack-variant server files
-  (`tools/attack_tools/*/*/*-{attack_type}.py`), extracted with `ast` without importing the
-  files. Benign rows: docstrings from the clean `*_server.py` files in the same directories.
-- **Responses:** `TOOL_RESPONSE_ATTACK_TEMPLATE` or `SIMULATED_USER_TEMPLATE` (from
-  `data/prompt_template.py`) + each of the 5 `attack_task.jsonl` implementations, one row
-  per response attack type × task (~15 unique texts; a small transfer check only).
+MSB assembles most attack texts at run time in its `main.py`; the stage rebuilds the static
+text the model would see. Six attack-tool servers under `tools/attack_tools/{agent}/{server}/`
+each have a clean server file and attack-variant files named `*-{attack_type}.py`.
+
+- **Benign descriptions:** the `@mcp.tool()` docstrings in each server's clean files,
+  extracted with `ast` without importing them (21 tools).
+- **Variant descriptions:** docstrings in the `*-{attack_type}.py` files that differ from
+  the clean docstring of the same tool (or name a tool the clean file lacks), for
+  `name_overlap`, `preference_manipulation`, `tool_transfer`, `out_of_scope_parameter`, and
+  `preference_manipulation-out_of_scope_parameter` (~96).
+- **Prompt-injection descriptions:** each clean tool description followed by
+  `PROMPT_INJECTION_TEMPLATE` with `{goal}` set to one seeded attack-task implementation, as
+  `main.py` does for `prompt_injection` (21).
+- **Responses (`tool_output`):** `false_error` = `TOOL_RESPONSE_ATTACK_TEMPLATE` + task,
+  `simulated_user` = `SIMULATED_USER_TEMPLATE` + task, `search_term_deception` = task alone,
+  for each of the 5 tasks in `attack_task.jsonl` (15). `{pid}` in `kill_process` is replaced
+  with a fixed number.
+- **Objectives:** rows that embed an attack task take the objective of that task
+  (`obtain_data_information` → data exfiltration, `kill_process` → denial of service, …);
+  variant-description rows take the objective of their attack type (`name_overlap` →
+  tool-selection manipulation, …).
 - `group` = the server directory for description rows (an attack-variant docstring is the
   clean one plus an injected sentence, so both must share a split) and the attack task for
   response rows.
@@ -116,7 +144,8 @@ dataset:
   objectives:
     bipia: {Task Automation: task_hijack, Keylogging: data_exfiltration, ...}
     mcptox: {Credential Leakage: data_exfiltration, Information Manipulation: misinformation, ...}
-    msb: {name_overlap: tool_selection_manipulation, prompt_injection: task_hijack, ...}
+    msb_tasks: {obtain_data_information: data_exfiltration, kill_process: denial_of_service, ...}
+    msb_types: {name_overlap: tool_selection_manipulation, out_of_scope_parameter: data_exfiltration, ...}
 ```
 
 The ~75 objective mappings are a coding judgment, the same one a paper coder makes. The
@@ -192,7 +221,7 @@ Exact counts come from `summary.json` after the first build.
 | rag_corpus (PoisonedRAG) | ~1,500 | ~3,000 | train_pool |
 | tool_output (BIPIA) | ~3,100 | ~3,100 | train_pool |
 | tool_description (MCPTox) | 485 | ~350 | loso_holdout |
-| tool_description + tool_output (MSB) | tens to low hundreds | tens | transfer_holdout |
+| tool_description + tool_output (MSB) | ~130 | 21 | transfer_holdout |
 
 ## Limitations
 
