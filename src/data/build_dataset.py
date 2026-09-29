@@ -10,6 +10,7 @@ Usage: python src/data/build_dataset.py [--config config.yaml]
 import hashlib
 import json
 import random
+import re
 from collections import Counter
 from pathlib import Path
 
@@ -233,4 +234,34 @@ def rows_bipia(raw: Path, generated: Path, surface: str, seed: int, attacks_per_
                         f"{group}:{name}:{position}", insert_attack(context, attacks[name], position, rng),
                         attack=("instruction", category, ("bipia", category)), **common,
                     ))
+    return rows
+
+
+# One "Tool: …\nDescription: …\nArguments:" block of an MCPTox clean system prompt.
+MCPTOX_TOOL_BLOCK = re.compile(r"Tool: (.+?)\nDescription: (.*?)\nArguments:", re.S)
+
+
+def tool_text(name: str, description: str) -> str:
+    """The one layout for every tool_description row, taken from MCPTox's system prompts."""
+    return f"Tool: {name}\nDescription: {description.strip()}"
+
+
+def rows_mcptox(raw: Path, surface: str) -> list[dict]:
+    """Each server's clean tool descriptions, plus the 485 poisoned tools."""
+    rows = []
+    for server, spec in read_json(raw / "response_all.json")["servers"].items():
+        group = f"mcptox:{server}"
+        for name, description in MCPTOX_TOOL_BLOCK.findall(spec["clean_system_promot"]):
+            rows.append(make_row(
+                f"{group}:clean:{name}", tool_text(name, description),
+                source="mcptox", subset=server, surface=surface, group=group,
+            ))
+    for entry in read_json(raw / "pure_tool.json"):
+        for key, tool in entry.items():
+            server, risk = tool["server_name"], tool["security risk"]
+            rows.append(make_row(
+                f"mcptox:{key}", tool_text(tool["tool_name"], tool["tool_content"]),
+                source="mcptox", subset=server, surface=surface, group=f"mcptox:{server}",
+                attack=("instruction", f"{risk} / {tool['paradigm']}", ("mcptox", risk)),
+            ))
     return rows
