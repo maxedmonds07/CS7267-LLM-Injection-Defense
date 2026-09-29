@@ -7,14 +7,19 @@ benign (0). Design: docs/superpowers/specs/2026-09-29-build-dataset-design.md
 Usage: python src/data/build_dataset.py [--config config.yaml]
 """
 
+import argparse
 import ast
 import hashlib
 import json
 import random
 import re
+import sys
 from collections import Counter
 from pathlib import Path
 
+import pyarrow as pa
+import pyarrow.parquet as pq
+import yaml
 from nltk.tokenize.punkt import PunktSentenceTokenizer
 
 COLUMNS = [
@@ -28,6 +33,7 @@ OBJECTIVES = {
 ROLES = {"train_pool", "loso_holdout", "transfer_holdout"}
 SPLITS = ("train", "val", "test")
 ATTACK_FIELDS = ("attack_kind", "attack_objective", "attack_family")
+SCHEMA = pa.schema([(name, pa.int8() if name == "label" else pa.string()) for name in COLUMNS])
 
 
 class BuildError(Exception):
@@ -179,7 +185,9 @@ def rows_poisonedrag(raw: Path, subsets: list[str], surface: str, top_k: int) ->
                     attack=("poisoning", "poisonedrag", ("poisonedrag", "poisonedrag")), **common,
                 ))
             scores = retrieved[qid]
-            for doc_id in sorted(scores, key=lambda d: (-scores[d], d))[:top_k]:
+            # BEIR has a few title-only passages; an empty negative teaches nothing, so skip it.
+            ranked = [d for d in sorted(scores, key=lambda d: (-scores[d], d)) if corpus[d].strip()]
+            for doc_id in ranked[:top_k]:
                 rows.append(make_row(f"{group}:doc:{doc_id}", corpus[doc_id], **common))
     return rows
 
@@ -352,3 +360,73 @@ def rows_msb(raw: Path, seed: int) -> list[dict]:
                 attack=("instruction", attack_type, ("msb_tasks", task)),
             ))
     return rows
+
+
+def build(config: dict) -> tuple[list[dict], dict]:
+    """All sources -> objectives -> dedupe -> roles -> splits -> validation."""
+    dataset = config["dataset"]
+    sources = dataset["sources"]
+    raw = Path(config["paths"]["raw_dir"])
+    generated = Path(config["paths"]["generated_dir"])
+    rows = [
+        *rows_poisonedrag(
+            raw / "poisonedrag", list(config["datasets"]["poisonedrag"]["beir"]["subsets"]),
+            sources["poisonedrag"]["attack_surface"], dataset["poisonedrag_benign_top_k"],
+        ),
+        *rows_bipia(
+            raw / "bipia", generated / "bipia", sources["bipia"]["attack_surface"],
+            dataset["seed"], dataset["bipia_attacks_per_context"],
+        ),
+        *rows_mcptox(raw / "mcptox", sources["mcptox"]["attack_surface"]),
+        *rows_msb(raw / "msb", dataset["seed"]),
+    ]
+    apply_objectives(rows, dataset["objectives"])
+    rows, dropped = dedupe(rows)
+    for row in rows:
+        row["role"] = sources[row["source"]]["role"]
+    assign_splits(rows, dataset["seed"], dataset["split_ratios"])
+    validate(rows)
+    return rows, summarize(rows, dropped)
+
+
+def summarize(rows: list[dict], dropped: int) -> dict:
+    """Row counts by source, surface, label and split: the stage's DVC metric."""
+    counts = {}
+    for (source, surface, label, split), n in sorted(
+        Counter((r["source"], r["attack_surface"], r["label"], r["split"]) for r in rows).items()
+    ):
+        kind = "adversarial" if label else "benign"
+        counts.setdefault(source, {}).setdefault(surface, {}).setdefault(kind, {})[split] = n
+    return {
+        "rows": len(rows),
+        "adversarial": sum(r["label"] for r in rows),
+        "duplicates_dropped": dropped,
+        "counts": counts,
+    }
+
+
+def write(rows: list[dict], summary: dict, out: Path, summary_path: Path) -> None:
+    """Write rows sorted by id, so the same inputs always give the same bytes."""
+    table = pa.Table.from_pylist(sorted(rows, key=lambda r: r["id"]), schema=SCHEMA)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(table, out)
+    summary_path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--config", default="config.yaml", type=Path)
+    args = parser.parse_args()
+
+    config = yaml.safe_load(args.config.read_text())
+    try:
+        rows, summary = build(config)
+    except BuildError as e:
+        sys.exit(f"build_dataset: {e}")
+    dataset = config["dataset"]
+    write(rows, summary, Path(dataset["out"]), Path(dataset["summary"]))
+    print(f"{summary['rows']} rows ({summary['adversarial']} adversarial) -> {dataset['out']}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()

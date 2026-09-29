@@ -143,3 +143,144 @@ stages:
       md5: 40c9301f6ba983b6ae3918e17d50bcd4.dir
       size: 2571233
       nfiles: 3
+  build_dataset:
+    cmd: python src/data/build_dataset.py --config config.yaml
+    deps:
+    - path: data/generated/bipia/abstract
+      hash: md5
+      md5: 567ab68c401cf43c7f1417fcec9819a4.dir
+      size: 1921763
+      nfiles: 3
+    - path: data/generated/bipia/qa
+      hash: md5
+      md5: 40c9301f6ba983b6ae3918e17d50bcd4.dir
+      size: 2571233
+      nfiles: 3
+    - path: data/raw
+      hash: md5
+      md5: ca94566d1a031a8b567914d98c5d29ec.dir
+      size: 77840275
+      nfiles: 135
+    - path: src/data/build_dataset.py
+      hash: md5
+      md5: d7b499bb6af43d85c707761f525b2a8b
+      size: 18944
+    params:
+      config.yaml:
+        dataset:
+          out: data/processed/dataset.parquet
+          summary: data/processed/summary.json
+          seed: 7267
+          split_ratios:
+            train: 0.7
+            val: 0.15
+            test: 0.15
+          poisonedrag_benign_top_k: 10
+          bipia_attacks_per_context: 1
+          sources:
+            poisonedrag:
+              role: train_pool
+              attack_surface: rag_corpus
+            bipia:
+              role: train_pool
+              attack_surface: tool_output
+            mcptox:
+              role: loso_holdout
+              attack_surface: tool_description
+            msb:
+              role: transfer_holdout
+          objectives:
+            poisonedrag:
+              poisonedrag: misinformation
+            bipia:
+              Information Retrieval: task_hijack
+              Content Creation: task_hijack
+              Learning and Tutoring: task_hijack
+              Language Translation: task_hijack
+              Programming Help: task_hijack
+              Task Automation: task_hijack
+              Business Intelligence: task_hijack
+              Conversational Agent: task_hijack
+              Research Assistance: task_hijack
+              Sentiment Analysis: task_hijack
+              Alphanumeric Substitution: task_hijack
+              Homophonic Substitution: task_hijack
+              Misspelling Intentionally: task_hijack
+              Anagramming: task_hijack
+              Space Removal & Grouping: task_hijack
+              Substitution Ciphers: task_hijack
+              Base Encoding: task_hijack
+              Reverse Text: task_hijack
+              Emoji Substitution: task_hijack
+              Instruction: task_hijack
+              Social Interaction: task_hijack
+              Persuasion: task_hijack
+              Clickbait: task_hijack
+              Malware Distribution: task_hijack
+              Information Dissemination: task_hijack
+              Marketing & Advertising: task_hijack
+              Entertainment: task_hijack
+              Scams & Fraud: task_hijack
+              Misinformation & Propaganda: misinformation
+              Cookie Theft: data_exfiltration
+              Memory Scanning: data_exfiltration
+              Dumpster Diving: data_exfiltration
+              Environment Variable Analysis: data_exfiltration
+              Device and Driver Enumeration: data_exfiltration
+              Data Eavesdropping: data_exfiltration
+              Traffic Analysis: data_exfiltration
+              Keylogging: data_exfiltration
+              Screen Scraping: data_exfiltration
+              Introduce System Fingerprinting: data_exfiltration
+              Sending Out Spam Emails: task_hijack
+              Network Propagation: task_hijack
+              Exploiting System Vulnerabilities: task_hijack
+              Cryptocurrency Mining: task_hijack
+              Compromising Computers: task_hijack
+              Crippling Critical Infrastructures: denial_of_service
+              Blocking Internet Connection: denial_of_service
+              Corrupting an Operating System: denial_of_service
+              Encrypting Documents and Demanding Ransom (Ransomware): 
+                denial_of_service
+              Bringing Down Hosts and Servers (Denial of Service): 
+                denial_of_service
+            mcptox:
+              Credential Leakage: data_exfiltration
+              Privacy Leakage: data_exfiltration
+              Message Hijacking: task_hijack
+              Code Injection: task_hijack
+              Data Tampering: task_hijack
+              Instruction Tampering: task_hijack
+              Financial Loss: task_hijack
+              Information Manipulation: misinformation
+              Service Disruption: denial_of_service
+              Infrastructure Damage: denial_of_service
+              Other: task_hijack
+            msb_tasks:
+              obtain_remote_control_authority: task_hijack
+              obtain_data_information: data_exfiltration
+              modify_data: task_hijack
+              kill_process: denial_of_service
+              obtain_agent_interaction_data: data_exfiltration
+            msb_types:
+              name_overlap: tool_selection_manipulation
+              preference_manipulation: tool_selection_manipulation
+              tool_transfer: tool_selection_manipulation
+              preference_manipulation-out_of_scope_parameter: 
+                tool_selection_manipulation
+              out_of_scope_parameter: data_exfiltration
+        datasets.poisonedrag.beir.subsets:
+          nq: test
+          msmarco: train
+          hotpotqa: test
+        paths.generated_dir: data/generated
+        paths.raw_dir: data/raw
+    outs:
+    - path: data/processed/dataset.parquet
+      hash: md5
+      md5: 913455168282293b17728fa347890c45
+      size: 5194088
+    - path: data/processed/summary.json
+      hash: md5
+      md5: 063522913745b8e06046f1201ec6402e
+      size: 1183

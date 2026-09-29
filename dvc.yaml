@@ -37,3 +37,24 @@ stages:
           - generated.bipia_webqa
     outs:
       - data/generated/bipia/qa
+
+  # One labeled table of untrusted text segments; see
+  # docs/superpowers/specs/2026-09-29-build-dataset-design.md
+  build_dataset:
+    cmd: python src/data/build_dataset.py --config config.yaml
+    deps:
+      - src/data/build_dataset.py
+      - data/raw
+      - data/generated/bipia/abstract
+      - data/generated/bipia/qa
+    params:
+      - config.yaml:
+          - dataset
+          - paths.raw_dir
+          - paths.generated_dir
+          - datasets.poisonedrag.beir.subsets
+    outs:
+      - data/processed/dataset.parquet
+    metrics:
+      - data/processed/summary.json:
+          cache: false

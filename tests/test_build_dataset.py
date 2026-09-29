@@ -151,6 +151,18 @@ def test_poisonedrag_rows(tmp_path):
     assert adversarial[0]["_objective"] == ("poisonedrag", "poisonedrag")
 
 
+def test_poisonedrag_skips_empty_passages(tmp_path):
+    # BEIR has a few title-only passages (e.g. NQ doc2148513); take the next-ranked one instead.
+    poisonedrag_fixture(tmp_path)
+    write_jsonl(tmp_path / "beir/nq/corpus.jsonl", [
+        {"_id": "d1", "title": "T", "text": "real d1"},
+        {"_id": "d2", "title": "Only a title", "text": "  "},
+        {"_id": "d3", "title": "T", "text": "real d3"},
+    ])
+    rows = bd.rows_poisonedrag(tmp_path, ["nq"], "rag_corpus", top_k=2)
+    assert [r["text"] for r in rows if r["label"] == 0] == ["real d3", "real d1"]
+
+
 def test_missing_input_points_to_make_data(tmp_path):
     with pytest.raises(bd.BuildError, match="make data"):
         bd.rows_poisonedrag(tmp_path, ["nq"], "rag_corpus", top_k=2)
@@ -335,3 +347,33 @@ def test_msb_missing_template_points_to_make_data(tmp_path):
     (tmp_path / "data/prompt_template.py").unlink()
     with pytest.raises(bd.BuildError, match="make data"):
         bd.rows_msb(tmp_path, seed=1)
+
+
+def test_summarize_counts_by_source_surface_label_split():
+    assert bd.summarize(valid_rows(), dropped=3) == {
+        "rows": 2,
+        "adversarial": 1,
+        "duplicates_dropped": 3,
+        "counts": {"s": {"rag_corpus": {"adversarial": {"train": 1}, "benign": {"train": 1}}}},
+    }
+
+
+def test_write_is_byte_identical(tmp_path):
+    for name in ("a", "b"):
+        rows = valid_rows()
+        bd.write(rows[::-1] if name == "b" else rows, {"rows": 2}, tmp_path / f"{name}.parquet", tmp_path / f"{name}.json")
+    assert (tmp_path / "a.parquet").read_bytes() == (tmp_path / "b.parquet").read_bytes()
+
+
+def test_build_on_fetched_data(monkeypatch):
+    config = yaml.safe_load((ROOT / "config.yaml").read_text())
+    if not (ROOT / config["paths"]["raw_dir"] / "msb/data/prompt_template.py").exists():
+        pytest.skip("data not fetched; run `make data`")
+    monkeypatch.chdir(ROOT)
+    rows, summary = bd.build(config)  # also runs every validation
+    again, _ = bd.build(config)
+    assert rows == again
+    assert {r["role"] for r in rows if r["source"] == "mcptox"} == {"loso_holdout"}
+    assert {r["role"] for r in rows if r["source"] == "msb"} == {"transfer_holdout"}
+    assert {r["attack_surface"] for r in rows} == {"rag_corpus", "tool_output", "tool_description"}
+    assert summary["adversarial"] > 5000
