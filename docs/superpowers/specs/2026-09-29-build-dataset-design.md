@@ -107,8 +107,8 @@ each have a clean server file and attack-variant files named `*-{attack_type}.py
   the clean docstring of the same tool (or name a tool the clean file lacks), for
   `name_overlap`, `preference_manipulation`, `tool_transfer`, `out_of_scope_parameter`, and
   `preference_manipulation-out_of_scope_parameter` (~96).
-- **Prompt-injection descriptions:** each clean tool description followed by
-  `PROMPT_INJECTION_TEMPLATE` with `{goal}` set to one seeded attack-task implementation, as
+- **Prompt-injection descriptions:** each clean tool description, right-stripped, then
+  `\n` and `PROMPT_INJECTION_TEMPLATE` with `{goal}` set to one seeded attack-task implementation, as
   `main.py` does for `prompt_injection` (21).
 - **Responses (`tool_output`):** `false_error` = `TOOL_RESPONSE_ATTACK_TEMPLATE` + task,
   `simulated_user` = `SIMULATED_USER_TEMPLATE` + task, `search_term_deception` = task alone,
@@ -158,9 +158,11 @@ implementation proposes them; a teammate reviews them in the PR.
   splits by group, validates the invariants, deduplicates, and writes the Parquet file and
   the summary. Usage matches the other stages:
   `python src/data/build_dataset.py --config config.yaml`.
-- `src/data/dataset.py`: `load(roles=..., splits=..., allow_holdout=False)`. Raises if a
-  requested `train` or `val` split would include a `loso_holdout` or `transfer_holdout` row
-  and `allow_holdout` is false.
+- `src/data/dataset.py`: `load(purpose, *, splits=None, roles=None, sources=None,
+  allow_holdout=False)`, where `purpose` is `"fit"` or `"eval"`. For `"fit"` it raises if
+  the result would contain a `loso_holdout` or `transfer_holdout` row, unless
+  `allow_holdout=True`. `"eval"` reads anything, so LOSO and transfer evaluation can score
+  every row of a held-out source.
 
 ## Pipeline
 
@@ -210,7 +212,7 @@ needed, like `test_generate_bipia.py`):
 - the same seed produces an identical file;
 - every category in the real `config.yaml` has an objective mapping (reads only config and
   the category lists, not the data);
-- `load` refuses held-out roles for train/val unless `allow_holdout=True`.
+- `load("fit", ...)` refuses held-out roles unless `allow_holdout=True`; `load("eval", ...)` returns them.
 
 ## Size estimate
 
