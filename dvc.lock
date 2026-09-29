@@ -66,13 +66,14 @@ stages:
             - data/attack_task.jsonl
             - data/attack_type.jsonl
             - data/tools/
+            - data/prompt_template.py
         paths.raw_dir: data/raw
     outs:
     - path: data/raw
       hash: md5
-      md5: 2487d054075848d950b43b59a7bdd8df.dir
-      size: 77838896
-      nfiles: 134
+      md5: ca94566d1a031a8b567914d98c5d29ec.dir
+      size: 77840275
+      nfiles: 135
   bipia_summarization:
     cmd: python src/data/generate_bipia.py --config config.yaml --task 
       bipia_summarization

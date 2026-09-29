@@ -8,6 +8,7 @@ dependencies = [
     "pyarrow>=25.0.1",
     "agentdojo==0.1.35",
     "pyyaml>=6.0.3",
+    "nltk>=3.10.3",
 ]
 
 [dependency-groups]
