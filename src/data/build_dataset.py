@@ -7,6 +7,7 @@ benign (0). Design: docs/superpowers/specs/2026-09-29-build-dataset-design.md
 Usage: python src/data/build_dataset.py [--config config.yaml]
 """
 
+import ast
 import hashlib
 import json
 import random
@@ -263,5 +264,91 @@ def rows_mcptox(raw: Path, surface: str) -> list[dict]:
                 f"mcptox:{key}", tool_text(tool["tool_name"], tool["tool_content"]),
                 source="mcptox", subset=server, surface=surface, group=f"mcptox:{server}",
                 attack=("instruction", f"{risk} / {tool['paradigm']}", ("mcptox", risk)),
+            ))
+    return rows
+
+
+# MSB response attacks (its main.py): attack type -> template constant, None = the task alone.
+MSB_RESPONSE_TEMPLATES = {
+    "false_error": "TOOL_RESPONSE_ATTACK_TEMPLATE",
+    "simulated_user": "SIMULATED_USER_TEMPLATE",
+    "search_term_deception": None,
+}
+MSB_PID = "4242"  # stands in for the live PID MSB substitutes into kill_process
+
+
+def is_tool_decorator(node: ast.expr) -> bool:
+    target = node.func if isinstance(node, ast.Call) else node
+    return isinstance(target, ast.Attribute) and target.attr == "tool"
+
+
+def tool_docstrings(path: Path) -> dict[str, str]:
+    """Docstrings of @mcp.tool() functions, read with ast so MSB's servers never run."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {
+        node.name: ast.get_docstring(node)
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and ast.get_docstring(node)
+        and any(is_tool_decorator(d) for d in node.decorator_list)
+    }
+
+
+def string_constants(path: Path) -> dict[str, str]:
+    """Top-level NAME = "..." assignments (MSB's data/prompt_template.py)."""
+    if not path.exists():
+        raise BuildError(f"missing {path}; run `make data` (or `dvc pull`)")
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {
+        target.id: node.value.value
+        for node in tree.body
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str)
+        for target in node.targets
+        if isinstance(target, ast.Name)
+    }
+
+
+def rows_msb(raw: Path, seed: int) -> list[dict]:
+    """The static texts MSB's main.py assembles: tool descriptions and tool responses."""
+    data = raw / "data"
+    templates = string_constants(data / "prompt_template.py")
+    tasks = {
+        t["attack_task"]: t["implementation"].replace("{pid}", MSB_PID)
+        for t in read_jsonl(data / "attack_task.jsonl")
+    }
+    rows = []
+    for server_dir in sorted(p for p in (data / "tools/attack_tools").glob("*/*") if p.is_dir()):
+        server = server_dir.name
+        group = f"msb:{server}"
+        common = dict(source="msb", subset=server, surface="tool_description", group=group)
+        clean = {}
+        for path in sorted(server_dir.glob("*.py")):
+            if "-" not in path.stem:
+                clean.update(tool_docstrings(path))
+        for name, doc in clean.items():
+            rows.append(make_row(f"{group}:clean:{name}", tool_text(name, doc), **common))
+            # main.py's prompt_injection: description.rstrip() + "\n" + the filled template.
+            task = random.Random(f"{seed}:{group}:{name}").choice(sorted(tasks))
+            injection = templates["PROMPT_INJECTION_TEMPLATE"].replace("{goal}", tasks[task])
+            rows.append(make_row(
+                f"{group}:prompt_injection:{name}", tool_text(name, doc.rstrip() + "\n" + injection),
+                attack=("instruction", "prompt_injection", ("msb_tasks", task)), **common,
+            ))
+        for path in sorted(server_dir.glob("*-*.py")):
+            attack_type = path.stem.split("-", 1)[1]
+            for name, doc in tool_docstrings(path).items():
+                if clean.get(name) != doc:
+                    rows.append(make_row(
+                        f"{group}:{attack_type}:{name}", tool_text(name, doc),
+                        attack=("instruction", attack_type, ("msb_types", attack_type)), **common,
+                    ))
+    for task, implementation in sorted(tasks.items()):
+        group = f"msb:task:{task}"
+        for attack_type, template in MSB_RESPONSE_TEMPLATES.items():
+            prefix = templates[template] if template else ""
+            rows.append(make_row(
+                f"{group}:{attack_type}", prefix + implementation,
+                source="msb", subset="tool_response", surface="tool_output", group=group,
+                attack=("instruction", attack_type, ("msb_tasks", task)),
             ))
     return rows
