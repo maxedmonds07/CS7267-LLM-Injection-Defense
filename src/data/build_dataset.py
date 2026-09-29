@@ -8,7 +8,9 @@ Usage: python src/data/build_dataset.py [--config config.yaml]
 """
 
 import hashlib
+import json
 from collections import Counter
+from pathlib import Path
 
 COLUMNS = [
     "id", "text", "label", "attack_kind", "attack_objective", "attack_family",
@@ -141,3 +143,37 @@ def validate(rows: list[dict]) -> None:
             problems.append(f"{message}: {bad[:5]}")
     if problems:
         raise BuildError("\n".join(problems))
+
+
+def read_json(path: Path):
+    if not path.exists():
+        raise BuildError(f"missing {path}; run `make data` (or `dvc pull`)")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def read_jsonl(path: Path) -> list[dict]:
+    if not path.exists():
+        raise BuildError(f"missing {path}; run `make data` (or `dvc pull`)")
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def rows_poisonedrag(raw: Path, subsets: list[str], surface: str, top_k: int) -> list[dict]:
+    """5 adversarial passages per target question, plus its top-k real retrieved passages."""
+    rows = []
+    for subset in subsets:
+        targets = read_json(raw / "results/adv_targeted_results" / f"{subset}.json")
+        retrieved = read_json(raw / "results/beir_results" / f"{subset}-contriever.json")
+        corpus = {doc["_id"]: doc["text"] for doc in read_jsonl(raw / "beir" / subset / "corpus.jsonl")}
+        for target in targets.values():
+            qid = target["id"]
+            group = f"poisonedrag:{subset}:{qid}"
+            common = dict(source="poisonedrag", subset=subset, surface=surface, group=group)
+            for j, text in enumerate(target["adv_texts"]):
+                rows.append(make_row(
+                    f"{group}:adv:{j}", text,
+                    attack=("poisoning", "poisonedrag", ("poisonedrag", "poisonedrag")), **common,
+                ))
+            scores = retrieved[qid]
+            for doc_id in sorted(scores, key=lambda d: (-scores[d], d))[:top_k]:
+                rows.append(make_row(f"{group}:doc:{doc_id}", corpus[doc_id], **common))
+    return rows

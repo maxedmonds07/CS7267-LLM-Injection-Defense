@@ -127,3 +127,30 @@ def test_validate_rejects_broken_rows(break_rows, message):
     break_rows(rows)
     with pytest.raises(bd.BuildError, match=message):
         bd.validate(rows)
+
+
+def poisonedrag_fixture(root):
+    write_json(root / "results/adv_targeted_results/nq.json",
+               {"q1": {"id": "q1", "question": "?", "adv_texts": ["fake one", "fake two"]}})
+    write_json(root / "results/beir_results/nq-contriever.json", {"q1": {"d1": 0.5, "d2": 0.9, "d3": 0.7}})
+    write_jsonl(root / "beir/nq/corpus.jsonl",
+                [{"_id": d, "title": "Title", "text": f"real {d}"} for d in ("d1", "d2", "d3")])
+
+
+def test_poisonedrag_rows(tmp_path):
+    poisonedrag_fixture(tmp_path)
+    rows = bd.rows_poisonedrag(tmp_path, ["nq"], "rag_corpus", top_k=2)
+    adversarial = [r for r in rows if r["label"] == 1]
+    benign = [r for r in rows if r["label"] == 0]
+    assert [r["text"] for r in adversarial] == ["fake one", "fake two"]
+    # Highest-scoring passages first, text only (PoisonedRAG never shows the LLM a title).
+    assert [r["text"] for r in benign] == ["real d2", "real d3"]
+    assert {r["group"] for r in rows} == {"poisonedrag:nq:q1"}
+    assert adversarial[0]["attack_kind"] == "poisoning"
+    assert adversarial[0]["attack_surface"] == "rag_corpus"
+    assert adversarial[0]["_objective"] == ("poisonedrag", "poisonedrag")
+
+
+def test_missing_input_points_to_make_data(tmp_path):
+    with pytest.raises(bd.BuildError, match="make data"):
+        bd.rows_poisonedrag(tmp_path, ["nq"], "rag_corpus", top_k=2)
