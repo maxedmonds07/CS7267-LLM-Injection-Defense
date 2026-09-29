@@ -212,8 +212,11 @@ def test_bipia_rows(tmp_path):
     rows = bd.rows_bipia(raw, generated, "tool_output", seed=1, attacks_per_context=1)
     clean = {r["group"]: r for r in rows if r["label"] == 0}
     injected = [r for r in rows if r["label"] == 1]
-    assert len(clean) == len(injected) == 2 * (2 + 2 + 1 + 1 + 1)
-    assert clean["bipia:code:train:0"]["text"] == "line one\nline two"
+    # 6 distinct text contexts per split; the code context is identical in train and test,
+    # so it appears once, as test.
+    assert len(clean) == len(injected) == 2 * (2 + 2 + 1 + 1) + 1
+    code = [r for r in clean.values() if r["subset"] == "code"]
+    assert [(r["text"], r["split"]) for r in code] == [("line one\nline two", "test")]
     for row in injected:
         assert row["group"] in clean and row["attack_surface"] == "tool_output"
         assert len(row["text"]) > len(clean[row["group"]]["text"])
@@ -229,8 +232,8 @@ def test_bipia_rows_are_deterministic_and_scale_with_attacks_per_context(tmp_pat
     once = bd.rows_bipia(raw, generated, "tool_output", seed=1, attacks_per_context=1)
     assert once == bd.rows_bipia(raw, generated, "tool_output", seed=1, attacks_per_context=1)
     twice = bd.rows_bipia(raw, generated, "tool_output", seed=1, attacks_per_context=2)
-    # 14 injected once; twice doubles all but the 2 code contexts, which have only 1 attack each.
-    assert sum(r["label"] for r in twice) == 2 * sum(r["label"] for r in once) - 2
+    # 13 injected once; twice doubles all but the one code context, which has only 1 attack.
+    assert sum(r["label"] for r in twice) == 2 * sum(r["label"] for r in once) - 1
 
 
 MCPTOX_PROMPT = (
@@ -376,4 +379,46 @@ def test_build_on_fetched_data(monkeypatch):
     assert {r["role"] for r in rows if r["source"] == "mcptox"} == {"loso_holdout"}
     assert {r["role"] for r in rows if r["source"] == "msb"} == {"transfer_holdout"}
     assert {r["attack_surface"] for r in rows} == {"rag_corpus", "tool_output", "tool_description"}
-    assert summary["adversarial"] > 5000
+    assert summary["adversarial"] > 4500
+    # Review #1/#2 regressions on the real data: no text has surrounding whitespace, and no
+    # BIPIA injected row is orphaned from its clean context (which would put the same context
+    # in two groups, and so possibly two splits). Near-duplicate contexts are out of scope.
+    assert all(r["text"] == r["text"].strip() for r in rows)
+    bipia = [r for r in rows if r["source"] == "bipia"]
+    assert {r["group"] for r in bipia if r["label"]} <= {r["group"] for r in bipia if not r["label"]}
+
+
+# --- Final-review fixes ---
+
+
+def test_row_text_is_stripped():
+    # Surrounding whitespace can't carry meaning, but can give the label away (review #2, #5).
+    assert ben(text="\nATTACK\ncontext\n")["text"] == "ATTACK\ncontext"
+
+
+def test_bipia_repeated_contexts_share_a_group_and_test_copies_win(tmp_path):
+    # Review #1: BIPIA repeats contexts; every copy must land in one group, and a context
+    # that is also in BIPIA's test split must be test-only, built with test attacks.
+    raw, generated = tmp_path / "raw", tmp_path / "generated"
+    bipia_fixture(raw, generated)
+    write_jsonl(raw / "benchmark/email/train.jsonl",
+                [{"context": "Same mail."}, {"context": "Same mail."}, {"context": "Shared mail."}])
+    write_jsonl(raw / "benchmark/email/test.jsonl", [{"context": "Shared mail."}])
+    rows = [r for r in bd.rows_bipia(raw, generated, "tool_output", seed=1, attacks_per_context=1)
+            if r["subset"] == "email"]
+    same = [r for r in rows if "Same mail." in r["text"]]
+    shared = [r for r in rows if "Shared mail." in r["text"]]
+    assert len(same) == len(shared) == 2  # one clean + one injected each
+    assert len({r["group"] for r in same}) == 1 and {r["split"] for r in same} == {"trainval"}
+    assert len({r["group"] for r in shared}) == 1 and {r["split"] for r in shared} == {"test"}
+    assert {r["attack_family"] for r in shared if r["label"]} == {"Cat B"}
+
+
+def test_msb_rename_only_variants_are_not_adversarial(tmp_path):
+    # Review #3: name_overlap / tool_transfer keep the clean docstring under a new name;
+    # their attack lives in the runtime response, so the description text carries none.
+    msb_fixture(tmp_path)
+    server = tmp_path / "data/tools/attack_tools/search_agent/Demo_Server"
+    (server / "demo_server-name_overlap.py").write_text(MSB_SERVER.replace("def search(", "def search_v1("))
+    ids = {r["id"] for r in bd.rows_msb(tmp_path, seed=1)}
+    assert "msb:Demo_Server:name_overlap:search_v1" not in ids

@@ -47,8 +47,10 @@ def make_row(row_id, text, *, source, subset, surface, group, split=None, attack
     The objective is looked up later by apply_objectives, from config.yaml.
     """
     row = dict.fromkeys(COLUMNS)
+    # Surrounding whitespace carries no meaning but can give the label away (e.g. BIPIA's
+    # middle insertion at offset 0 leaves a leading newline), so every row is stripped.
     row.update(
-        id=row_id, text=text, label=0, source=source, subset=subset,
+        id=row_id, text=text.strip(), label=0, source=source, subset=subset,
         attack_surface=surface, group=group, split=split,
     )
     if attack:
@@ -215,34 +217,40 @@ def flatten_attacks(attacks: dict) -> dict:
 
 
 def rows_bipia(raw: Path, generated: Path, surface: str, seed: int, attacks_per_context: int) -> list[dict]:
-    """Every clean context, plus sampled attacks inserted at sampled positions.
+    """Every distinct clean context, plus sampled attacks inserted at sampled positions.
 
     BIPIA's own train/test split is kept: its train contexts and attacks become our
-    train/val ("trainval"), its test ones our test.
+    train/val ("trainval"), its test ones our test. BIPIA repeats contexts, so each
+    distinct context is one group; one that is also in BIPIA's test split is test-only.
     """
     rows = []
     for task, attack_file in BIPIA_TASKS.items():
-        for bipia_split in ("train", "test"):
-            attacks = flatten_attacks(read_json(raw / "benchmark" / f"{attack_file}_attack_{bipia_split}.json"))
-            names = sorted(attacks)
-            base = generated if task in BIPIA_GENERATED else raw / "benchmark"
-            contexts = read_jsonl(base / task / f"{bipia_split}.jsonl")
-            preset = "trainval" if bipia_split == "train" else "test"
-            for i, sample in enumerate(contexts):
+        base = generated if task in BIPIA_GENERATED else raw / "benchmark"
+        attacks, split_of = {}, {}
+        for bipia_split in ("test", "train"):  # test first, so a shared context stays test
+            attacks[bipia_split] = flatten_attacks(
+                read_json(raw / "benchmark" / f"{attack_file}_attack_{bipia_split}.json")
+            )
+            for sample in read_jsonl(base / task / f"{bipia_split}.jsonl"):
                 context = sample["context"]
                 if isinstance(context, list):  # code contexts are lists of lines
                     context = "\n".join(context)
-                group = f"bipia:{task}:{bipia_split}:{i}"
-                common = dict(source="bipia", subset=task, surface=surface, group=group, split=preset)
-                rows.append(make_row(f"{group}:clean", context, **common))
-                rng = random.Random(f"{seed}:{group}")
-                for name in rng.sample(names, k=min(attacks_per_context, len(names))):
-                    position = rng.choice(POSITIONS)
-                    category = name.rsplit("-", 1)[0]
-                    rows.append(make_row(
-                        f"{group}:{name}:{position}", insert_attack(context, attacks[name], position, rng),
-                        attack=("instruction", category, ("bipia", category)), **common,
-                    ))
+                split_of.setdefault(context, bipia_split)
+        for context, bipia_split in split_of.items():
+            names = sorted(attacks[bipia_split])
+            digest = hashlib.sha256(context.encode()).hexdigest()[:16]
+            group = f"bipia:{task}:{bipia_split}:{digest}"
+            preset = "trainval" if bipia_split == "train" else "test"
+            common = dict(source="bipia", subset=task, surface=surface, group=group, split=preset)
+            rows.append(make_row(f"{group}:clean", context, **common))
+            rng = random.Random(f"{seed}:{group}")
+            for name in rng.sample(names, k=min(attacks_per_context, len(names))):
+                position = rng.choice(POSITIONS)
+                category = name.rsplit("-", 1)[0]
+                rows.append(make_row(
+                    f"{group}:{name}:{position}", insert_attack(context, attacks[bipia_split][name], position, rng),
+                    attack=("instruction", category, ("bipia", category)), **common,
+                ))
     return rows
 
 
@@ -342,10 +350,14 @@ def rows_msb(raw: Path, seed: int) -> list[dict]:
                 f"{group}:prompt_injection:{name}", tool_text(name, doc.rstrip() + "\n" + injection),
                 attack=("instruction", "prompt_injection", ("msb_tasks", task)), **common,
             ))
+        # A variant docstring is adversarial only if its text is new: name_overlap and
+        # tool_transfer reuse a clean docstring under another name, and their attack lives
+        # in the runtime response, not in the description.
+        clean_docs = set(clean.values())
         for path in sorted(server_dir.glob("*-*.py")):
             attack_type = path.stem.split("-", 1)[1]
             for name, doc in tool_docstrings(path).items():
-                if clean.get(name) != doc:
+                if doc not in clean_docs:
                     rows.append(make_row(
                         f"{group}:{attack_type}:{name}", tool_text(name, doc),
                         attack=("instruction", attack_type, ("msb_types", attack_type)), **common,

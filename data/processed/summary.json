@@ -1,17 +1,17 @@
 {
-  "adversarial": 5291,
+  "adversarial": 4861,
   "counts": {
     "bipia": {
       "tool_output": {
         "adversarial": {
-          "test": 400,
-          "train": 2344,
-          "val": 456
+          "test": 377,
+          "train": 2004,
+          "val": 425
         },
         "benign": {
-          "test": 353,
-          "train": 2042,
-          "val": 411
+          "test": 377,
+          "train": 2004,
+          "val": 425
         }
       }
     },
@@ -32,8 +32,8 @@
     "msb": {
       "tool_description": {
         "adversarial": {
-          "test": 18,
-          "train": 73
+          "test": 6,
+          "train": 49
         },
         "benign": {
           "test": 6,
@@ -62,6 +62,6 @@
       }
     }
   },
-  "duplicates_dropped": 465,
-  "rows": 11435
+  "duplicates_dropped": 47,
+  "rows": 11005
 }

@@ -46,6 +46,10 @@ Output: `data/processed/dataset.parquet`, one row per text segment.
 | `split` | str | `train`, `val`, `test` | Assigned per group |
 | `role` | str | `train_pool`, `loso_holdout`, `transfer_holdout` | Per source, from `config.yaml` |
 
+Every row's `text` is stripped of surrounding whitespace: it carries no meaning, but
+insertion artifacts (a leading `\n` from BIPIA's middle insertion at offset 0, trailing
+`\n` on some PoisonedRAG adversarial texts) would otherwise reveal the label.
+
 Invariants: `label == 0` exactly when `attack_kind`, `attack_objective` and `attack_family`
 are null; `id` is unique; a `group` never spans two splits.
 
@@ -77,8 +81,11 @@ are null; `id` is unique; a `group` never spans two splits.
   train groups); BIPIA's `test` feeds our `test`. BIPIA's train and test attack categories
   are disjoint except `Language Translation` (different attack strings in each), so our test
   mostly measures unseen attack families.
-- `group` = `{task}:{bipia split}:{context index}`, so a context's clean and injected
-  versions share a split.
+- `group` = `bipia:{task}:{bipia split}:{sha256(context)[:16]}`. BIPIA repeats contexts
+  (283 train tables alone), so grouping is by context text, not row index: every copy
+  shares one group and one split. A context that appears in both BIPIA splits is built
+  once, as test, with test attacks. Near-duplicates (for example the same email with an
+  extra header) are not merged.
 
 ### Tool-description text format
 
@@ -103,8 +110,10 @@ each have a clean server file and attack-variant files named `*-{attack_type}.py
 
 - **Benign descriptions:** the `@mcp.tool()` docstrings in each server's clean files,
   extracted with `ast` without importing them (21 tools).
-- **Variant descriptions:** docstrings in the `*-{attack_type}.py` files that differ from
-  the clean docstring of the same tool (or name a tool the clean file lacks), for
+- **Variant descriptions:** docstrings in the `*-{attack_type}.py` files whose text differs
+  from every clean docstring of the server. `name_overlap` and `tool_transfer` mostly
+  reuse a clean docstring under a new name (their attack is in the runtime response), so
+  those rows carry no attack text and are left out. Applies to
   `name_overlap`, `preference_manipulation`, `tool_transfer`, `out_of_scope_parameter`, and
   `preference_manipulation-out_of_scope_parameter` (~96).
 - **Prompt-injection descriptions:** each clean tool description, right-stripped, then
@@ -160,8 +169,8 @@ implementation proposes them; a teammate reviews them in the PR.
   `python src/data/build_dataset.py --config config.yaml`.
 - `src/data/dataset.py`: `load(purpose, *, splits=None, roles=None, sources=None,
   allow_holdout=False)`, where `purpose` is `"fit"` or `"eval"`. For `"fit"` it raises if
-  the result would contain a `loso_holdout` or `transfer_holdout` row, unless
-  `allow_holdout=True`. `"eval"` reads anything, so LOSO and transfer evaluation can score
+  the result would contain a `loso_holdout` or `transfer_holdout` row, or any `test`
+  split row, unless `allow_holdout=True`. `"eval"` reads anything, so LOSO and transfer evaluation can score
   every row of a held-out source.
 
 ## Pipeline

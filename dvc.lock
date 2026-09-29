@@ -163,8 +163,8 @@ stages:
       nfiles: 135
     - path: src/data/build_dataset.py
       hash: md5
-      md5: d7b499bb6af43d85c707761f525b2a8b
-      size: 18944
+      md5: 418da3704561a9d24cc5668874d9d128
+      size: 19780
     params:
       config.yaml:
         dataset:
@@ -278,9 +278,9 @@ stages:
     outs:
     - path: data/processed/dataset.parquet
       hash: md5
-      md5: 913455168282293b17728fa347890c45
-      size: 5194088
+      md5: a1c6426890678d576fb6231dc6050491
+      size: 4945113
     - path: data/processed/summary.json
       hash: md5
-      md5: 063522913745b8e06046f1201ec6402e
-      size: 1183
+      md5: 6e20f4841a67d8cb733520d51931bf03
+      size: 1181

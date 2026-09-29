@@ -42,3 +42,10 @@ def test_eval_reads_every_split_of_a_holdout(path):
 def test_unknown_purpose(path):
     with pytest.raises(ValueError, match="purpose"):
         load("train", path=path)
+
+
+def test_fit_refuses_the_test_split(path):
+    # Review #6: roles=["train_pool"] alone must not hand test rows to a fit.
+    with pytest.raises(HoldoutError, match="test"):
+        load("fit", roles=["train_pool"], path=path)
+    assert load("fit", roles=["train_pool"], splits=["train", "val"], path=path).num_rows == 1
