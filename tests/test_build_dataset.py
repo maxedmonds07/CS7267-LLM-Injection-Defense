@@ -154,3 +154,68 @@ def test_poisonedrag_rows(tmp_path):
 def test_missing_input_points_to_make_data(tmp_path):
     with pytest.raises(bd.BuildError, match="make data"):
         bd.rows_poisonedrag(tmp_path, ["nq"], "rag_corpus", top_k=2)
+
+
+def test_insert_attack_start_and_end():
+    rng = random.Random(0)
+    assert bd.insert_attack("ctx", "ATTACK", "start", rng) == "ATTACK\nctx"
+    assert bd.insert_attack("ctx", "ATTACK", "end", rng) == "ctx\nATTACK"
+
+
+def test_insert_attack_middle_uses_a_sentence_boundary():
+    context = "First one. Second one. Third one."
+    out = bd.insert_attack(context, "ATTACK", "middle", random.Random(3))
+    assert out in {
+        "\nATTACK\n" + context,
+        "First one. \nATTACK\nSecond one. Third one.",
+        "First one. Second one. \nATTACK\nThird one.",
+    }
+
+
+def test_insert_attack_middle_of_a_single_sentence_goes_first():
+    assert bd.insert_attack("Only one sentence", "ATTACK", "middle", random.Random(0)) == "\nATTACK\nOnly one sentence"
+
+
+def test_flatten_attacks_matches_bipia_names():
+    assert bd.flatten_attacks({"Cat": ["a", "b"]}) == {"Cat-0": "a", "Cat-1": "b"}
+
+
+def bipia_fixture(raw, generated):
+    bench = raw / "benchmark"
+    for split, category in (("train", "Cat A"), ("test", "Cat B")):
+        write_json(bench / f"text_attack_{split}.json", {category: [f"{category} attack 0", f"{category} attack 1"]})
+        write_json(bench / f"code_attack_{split}.json", {f"Code {category}": [f"code {category} attack"]})
+        for task in ("email", "table"):
+            write_jsonl(bench / task / f"{split}.jsonl",
+                        [{"context": f"{task} {split} {i}. More text here.", "ideal": ""} for i in range(2)])
+        write_jsonl(bench / "code" / f"{split}.jsonl",
+                    [{"context": ["line one", "line two"], "code": [], "error": [], "ideal": []}])
+        for task in ("qa", "abstract"):
+            write_jsonl(generated / task / f"{split}.jsonl", [{"context": f"{task} {split} text.", "ideal": ""}])
+
+
+def test_bipia_rows(tmp_path):
+    raw, generated = tmp_path / "raw", tmp_path / "generated"
+    bipia_fixture(raw, generated)
+    rows = bd.rows_bipia(raw, generated, "tool_output", seed=1, attacks_per_context=1)
+    clean = {r["group"]: r for r in rows if r["label"] == 0}
+    injected = [r for r in rows if r["label"] == 1]
+    assert len(clean) == len(injected) == 2 * (2 + 2 + 1 + 1 + 1)
+    assert clean["bipia:code:train:0"]["text"] == "line one\nline two"
+    for row in injected:
+        assert row["group"] in clean and row["attack_surface"] == "tool_output"
+        assert len(row["text"]) > len(clean[row["group"]]["text"])
+        split = row["group"].split(":")[2]
+        assert row["split"] == ("trainval" if split == "train" else "test")
+        expected = "Cat A" if split == "train" else "Cat B"
+        assert row["attack_family"] == (f"Code {expected}" if row["subset"] == "code" else expected)
+
+
+def test_bipia_rows_are_deterministic_and_scale_with_attacks_per_context(tmp_path):
+    raw, generated = tmp_path / "raw", tmp_path / "generated"
+    bipia_fixture(raw, generated)
+    once = bd.rows_bipia(raw, generated, "tool_output", seed=1, attacks_per_context=1)
+    assert once == bd.rows_bipia(raw, generated, "tool_output", seed=1, attacks_per_context=1)
+    twice = bd.rows_bipia(raw, generated, "tool_output", seed=1, attacks_per_context=2)
+    # 14 injected once; twice doubles all but the 2 code contexts, which have only 1 attack each.
+    assert sum(r["label"] for r in twice) == 2 * sum(r["label"] for r in once) - 2

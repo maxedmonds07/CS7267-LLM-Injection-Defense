@@ -9,8 +9,11 @@ Usage: python src/data/build_dataset.py [--config config.yaml]
 
 import hashlib
 import json
+import random
 from collections import Counter
 from pathlib import Path
+
+from nltk.tokenize.punkt import PunktSentenceTokenizer
 
 COLUMNS = [
     "id", "text", "label", "attack_kind", "attack_objective", "attack_family",
@@ -176,4 +179,58 @@ def rows_poisonedrag(raw: Path, subsets: list[str], surface: str, top_k: int) ->
             scores = retrieved[qid]
             for doc_id in sorted(scores, key=lambda d: (-scores[d], d))[:top_k]:
                 rows.append(make_row(f"{group}:doc:{doc_id}", corpus[doc_id], **common))
+    return rows
+
+
+POSITIONS = ("start", "middle", "end")
+# task -> attack file prefix (text_attack_*.json or code_attack_*.json)
+BIPIA_TASKS = {"email": "text", "table": "text", "qa": "text", "abstract": "text", "code": "code"}
+BIPIA_GENERATED = {"qa", "abstract"}  # rebuilt by the bipia_* stages into data/generated
+
+
+def insert_attack(context: str, attack: str, position: str, rng: random.Random) -> str:
+    """BIPIA's insert_start / insert_end / insert_middle (bipia/data/utils.py)."""
+    if position == "start":
+        return "\n".join([attack, context])
+    if position == "end":
+        return "\n".join([context, attack])
+    spans = list(PunktSentenceTokenizer().span_tokenize(context))
+    start, _ = rng.sample(spans, k=1)[0]
+    return "\n".join([context[:start], attack, context[start:]])
+
+
+def flatten_attacks(attacks: dict) -> dict:
+    """Name each attack string "{category}-{i}", as BIPIA's load_attack does."""
+    return {f"{category}-{i}": text for category, texts in attacks.items() for i, text in enumerate(texts)}
+
+
+def rows_bipia(raw: Path, generated: Path, surface: str, seed: int, attacks_per_context: int) -> list[dict]:
+    """Every clean context, plus sampled attacks inserted at sampled positions.
+
+    BIPIA's own train/test split is kept: its train contexts and attacks become our
+    train/val ("trainval"), its test ones our test.
+    """
+    rows = []
+    for task, attack_file in BIPIA_TASKS.items():
+        for bipia_split in ("train", "test"):
+            attacks = flatten_attacks(read_json(raw / "benchmark" / f"{attack_file}_attack_{bipia_split}.json"))
+            names = sorted(attacks)
+            base = generated if task in BIPIA_GENERATED else raw / "benchmark"
+            contexts = read_jsonl(base / task / f"{bipia_split}.jsonl")
+            preset = "trainval" if bipia_split == "train" else "test"
+            for i, sample in enumerate(contexts):
+                context = sample["context"]
+                if isinstance(context, list):  # code contexts are lists of lines
+                    context = "\n".join(context)
+                group = f"bipia:{task}:{bipia_split}:{i}"
+                common = dict(source="bipia", subset=task, surface=surface, group=group, split=preset)
+                rows.append(make_row(f"{group}:clean", context, **common))
+                rng = random.Random(f"{seed}:{group}")
+                for name in rng.sample(names, k=min(attacks_per_context, len(names))):
+                    position = rng.choice(POSITIONS)
+                    category = name.rsplit("-", 1)[0]
+                    rows.append(make_row(
+                        f"{group}:{name}:{position}", insert_attack(context, attacks[name], position, rng),
+                        attack=("instruction", category, ("bipia", category)), **common,
+                    ))
     return rows
