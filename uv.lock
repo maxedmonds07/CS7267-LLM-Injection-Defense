@@ -1105,6 +1105,7 @@ dependencies = [
     { name = "boto3" },
     { name = "mlflow" },
     { name = "nltk" },
+    { name = "pandas" },
     { name = "pyarrow" },
     { name = "pyyaml" },
 ]
@@ -1126,6 +1127,7 @@ requires-dist = [
     { name = "boto3", specifier = ">=1.43.103" },
     { name = "mlflow", specifier = ">=3.16.1" },
     { name = "nltk", specifier = ">=3.10.3" },
+    { name = "pandas", specifier = ">=3.0.6" },
     { name = "pyarrow", specifier = ">=25.0.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]

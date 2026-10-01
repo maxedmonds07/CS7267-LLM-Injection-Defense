@@ -284,3 +284,23 @@ stages:
       hash: md5
       md5: 6e20f4841a67d8cb733520d51931bf03
       size: 1181
+  profile_dataset:
+    cmd: python src/data/profile_dataset.py
+    deps:
+    - path: data/processed/dataset.parquet
+      hash: md5
+      md5: a1c6426890678d576fb6231dc6050491
+      size: 4945113
+    - path: src/data/profile_dataset.py
+      hash: md5
+      md5: 9da292e6bb14aab300d06e0914ad1475
+      size: 5483
+    outs:
+    - path: data/processed/profile.json
+      hash: md5
+      md5: 95e75a20600f97b763e3e9e051086747
+      size: 3791
+    - path: data/processed/profile.md
+      hash: md5
+      md5: 758fa570b87f660e38a801234cb69b83
+      size: 2149
