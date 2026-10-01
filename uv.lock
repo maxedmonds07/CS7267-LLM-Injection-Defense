@@ -1107,13 +1107,13 @@ dependencies = [
     { name = "nltk" },
     { name = "pyarrow" },
     { name = "pyyaml" },
+    { name = "scikit-learn" },
 ]
 
 [package.dev-dependencies]
 dev = [
     { name = "dvc", extra = ["s3"] },
     { name = "pytest" },
-    { name = "scikit-learn" },
 ]
 mlflow-server = [
     { name = "psycopg", extra = ["binary"] },
@@ -1128,13 +1128,13 @@ requires-dist = [
     { name = "nltk", specifier = ">=3.10.3" },
     { name = "pyarrow", specifier = ">=25.0.1" },
     { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "scikit-learn", specifier = ">=1.9.1" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "dvc", extras = ["s3"], specifier = ">=3.67.1" },
     { name = "pytest", specifier = ">=9.1.1" },
-    { name = "scikit-learn", specifier = ">=1.9.1" },
 ]
 mlflow-server = [
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.6" },
