@@ -70,6 +70,7 @@ datasets:
       - data/attack_task.jsonl
       - data/attack_type.jsonl
       - data/tools/
+      - data/prompt_template.py
 
 # Contexts rebuilt from third-party sources by the bipia_* stages in dvc.yaml, following
 # BIPIA's benchmark/{qa,abstract}/process.py. Output must match BIPIA's md5.txt byte for byte,
@@ -102,3 +103,103 @@ harnesses:
     license: MIT
     surface: agent
     role: end-to-end ASR harness
+
+# Inputs to the `build_dataset` stage: one labeled table of untrusted text segments.
+# Design: docs/superpowers/specs/2026-09-29-build-dataset-design.md
+dataset:
+  out: data/processed/dataset.parquet
+  summary: data/processed/summary.json
+  seed: 7267
+  split_ratios: {train: 0.70, val: 0.15, test: 0.15}
+  poisonedrag_benign_top_k: 10
+  bipia_attacks_per_context: 1
+  sources:
+    poisonedrag: {role: train_pool, attack_surface: rag_corpus}
+    bipia: {role: train_pool, attack_surface: tool_output}
+    mcptox: {role: loso_holdout, attack_surface: tool_description}
+    msb: {role: transfer_holdout}  # tool_description or tool_output, set per row
+  # Source category -> coding-matrix attack objective: task_hijack, data_exfiltration,
+  # misinformation, denial_of_service, tool_selection_manipulation. This is a coding
+  # judgment: review changes here like an edit to the coding matrix. The build fails on
+  # any category that is missing.
+  objectives:
+    poisonedrag:
+      poisonedrag: misinformation
+    bipia:
+      # Text attacks, task-irrelevant (text_attack_{train,test}.json)
+      Information Retrieval: task_hijack
+      Content Creation: task_hijack
+      Learning and Tutoring: task_hijack
+      Language Translation: task_hijack
+      Programming Help: task_hijack
+      Task Automation: task_hijack
+      Business Intelligence: task_hijack
+      Conversational Agent: task_hijack
+      Research Assistance: task_hijack
+      Sentiment Analysis: task_hijack
+      # Text attacks, output manipulation
+      Alphanumeric Substitution: task_hijack
+      Homophonic Substitution: task_hijack
+      Misspelling Intentionally: task_hijack
+      Anagramming: task_hijack
+      "Space Removal & Grouping": task_hijack
+      Substitution Ciphers: task_hijack
+      Base Encoding: task_hijack
+      Reverse Text: task_hijack
+      Emoji Substitution: task_hijack
+      # Text attacks, targeted content
+      Instruction: task_hijack
+      Social Interaction: task_hijack
+      Persuasion: task_hijack
+      Clickbait: task_hijack
+      Malware Distribution: task_hijack
+      Information Dissemination: task_hijack
+      "Marketing & Advertising": task_hijack
+      Entertainment: task_hijack
+      "Scams & Fraud": task_hijack
+      "Misinformation & Propaganda": misinformation
+      # Code attacks (code_attack_{train,test}.json)
+      Cookie Theft: data_exfiltration
+      Memory Scanning: data_exfiltration
+      Dumpster Diving: data_exfiltration
+      Environment Variable Analysis: data_exfiltration
+      Device and Driver Enumeration: data_exfiltration
+      Data Eavesdropping: data_exfiltration
+      Traffic Analysis: data_exfiltration
+      Keylogging: data_exfiltration
+      Screen Scraping: data_exfiltration
+      Introduce System Fingerprinting: data_exfiltration
+      Sending Out Spam Emails: task_hijack
+      Network Propagation: task_hijack
+      Exploiting System Vulnerabilities: task_hijack
+      Cryptocurrency Mining: task_hijack
+      Compromising Computers: task_hijack
+      Crippling Critical Infrastructures: denial_of_service
+      Blocking Internet Connection: denial_of_service
+      Corrupting an Operating System: denial_of_service
+      "Encrypting Documents and Demanding Ransom (Ransomware)": denial_of_service
+      "Bringing Down Hosts and Servers (Denial of Service)": denial_of_service
+    mcptox:  # pure_tool.json "security risk"
+      Credential Leakage: data_exfiltration
+      Privacy Leakage: data_exfiltration
+      Message Hijacking: task_hijack
+      Code Injection: task_hijack
+      Data Tampering: task_hijack
+      Instruction Tampering: task_hijack
+      Financial Loss: task_hijack
+      Information Manipulation: misinformation
+      Service Disruption: denial_of_service
+      Infrastructure Damage: denial_of_service
+      Other: task_hijack
+    msb_tasks:  # attack_task.jsonl, for rows that embed a task
+      obtain_remote_control_authority: task_hijack
+      obtain_data_information: data_exfiltration
+      modify_data: task_hijack
+      kill_process: denial_of_service
+      obtain_agent_interaction_data: data_exfiltration
+    msb_types:  # attack-variant tool files, for rewritten tool descriptions
+      name_overlap: tool_selection_manipulation
+      preference_manipulation: tool_selection_manipulation
+      tool_transfer: tool_selection_manipulation
+      preference_manipulation-out_of_scope_parameter: tool_selection_manipulation
+      out_of_scope_parameter: data_exfiltration

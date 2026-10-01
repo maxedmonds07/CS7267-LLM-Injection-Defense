@@ -1,0 +1,67 @@
+{
+  "adversarial": 4861,
+  "counts": {
+    "bipia": {
+      "tool_output": {
+        "adversarial": {
+          "test": 377,
+          "train": 2004,
+          "val": 425
+        },
+        "benign": {
+          "test": 377,
+          "train": 2004,
+          "val": 425
+        }
+      }
+    },
+    "mcptox": {
+      "tool_description": {
+        "adversarial": {
+          "test": 66,
+          "train": 327,
+          "val": 92
+        },
+        "benign": {
+          "test": 43,
+          "train": 245,
+          "val": 74
+        }
+      }
+    },
+    "msb": {
+      "tool_description": {
+        "adversarial": {
+          "test": 6,
+          "train": 49
+        },
+        "benign": {
+          "test": 6,
+          "train": 15
+        }
+      },
+      "tool_output": {
+        "adversarial": {
+          "train": 9,
+          "val": 6
+        }
+      }
+    },
+    "poisonedrag": {
+      "rag_corpus": {
+        "adversarial": {
+          "test": 230,
+          "train": 1080,
+          "val": 190
+        },
+        "benign": {
+          "test": 450,
+          "train": 2129,
+          "val": 376
+        }
+      }
+    }
+  },
+  "duplicates_dropped": 47,
+  "rows": 11005
+}
