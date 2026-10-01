@@ -109,7 +109,7 @@ Current build (`data/processed/summary.json`, 11,005 rows, 47 exact duplicates d
 The full design, including per-source construction, the attack-objective mapping and known
 limitations, is in
 [`docs/superpowers/specs/2026-09-29-build-dataset-design.md`](docs/superpowers/specs/2026-09-29-build-dataset-design.md).
-[`DATASHEET.md`](DATASHEET.md) documents the dataset for readers: intended uses, known
+[`DATA_CARD.md`](DATA_CARD.md) is the data card: intended uses, known
 shortcuts and distribution constraints.
 
 ### Loading data
