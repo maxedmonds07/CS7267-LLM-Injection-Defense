@@ -95,59 +95,23 @@ cd mlflow-server
 
 ---
 
-## 2.2 Create a Virtual Environment
+## 2.2 Install Dependencies
 
-### Windows
+The project is managed with [uv](https://docs.astral.sh/uv/). MLflow and boto3 are main project dependencies (training and evaluation code uses them). The extra packages needed only to host the tracking server (`psycopg` for Neon PostgreSQL and `python-dotenv` for reading `.env`) live in the `mlflow-server` dependency group.
 
-```powershell
-python -m venv .venv
-```
-
-Activate it:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-If PowerShell blocks script execution, run:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
-Then activate again:
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-### macOS / Linux
+From anywhere in the repository, run:
 
 ```bash
-python3 -m venv .venv
+uv sync --group mlflow-server
 ```
 
-Activate it:
+This creates `.venv` at the repository root, so you do not have to create or activate a virtual environment yourself.
 
-```bash
-source .venv/bin/activate
-```
+Every collaborator gets the exact versions pinned in `uv.lock`. Do not upgrade MLflow on your own; change it through `pyproject.toml` / `uv.lock` in a pull request.
 
 ---
 
-## 2.3 Install MLflow Requirements
-
-```bash
-pip install -r requirements.txt
-```
-
-The project uses the same `requirements.txt` so that all collaborators use compatible MLflow versions.
-
-Do not independently upgrade MLflow unless the change is made through the repository's `requirements.txt`.
-
----
-
-## 2.4 Configure the `.env` File
+## 2.3 Configure the `.env` File
 
 Each team member needs a local:
 
@@ -203,7 +167,7 @@ MLFLOW_TEAM_MEMBER=Bob
 
 ---
 
-## 2.5 Never Commit `.env`
+## 2.4 Never Commit `.env`
 
 The `.env` file contains credentials and must never be pushed to GitHub.
 
@@ -224,7 +188,7 @@ Never put database passwords, storage credentials, or access keys inside:
 
 ---
 
-## 2.6 Start the MLflow Server
+## 2.5 Start the MLflow Server
 
 Every time you want to use MLflow, open a terminal and enter:
 
@@ -232,24 +196,10 @@ Every time you want to use MLflow, open a terminal and enter:
 cd mlflow-server
 ```
 
-Activate the virtual environment.
-
-### Windows
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-### macOS / Linux
-
-```bash
-source .venv/bin/activate
-```
-
 Start MLflow:
 
 ```bash
-python start_mlflow.py
+uv run --group mlflow-server python start_mlflow.py
 ```
 
 Open:
@@ -619,7 +569,7 @@ the local MLflow server should be running.
 Start it with:
 
 ```bash
-python start_mlflow.py
+uv run --group mlflow-server python start_mlflow.py
 ```
 
 Your training code communicates with:
@@ -648,7 +598,7 @@ You can stop the local MLflow server.
 Later:
 
 ```bash
-python start_mlflow.py
+uv run --group mlflow-server python start_mlflow.py
 ```
 
 and all previous experiments will appear again.

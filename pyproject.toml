@@ -9,12 +9,19 @@ dependencies = [
     "agentdojo==0.1.35",
     "pyyaml>=6.0.3",
     "nltk>=3.10.3",
+    "mlflow>=3.16.1",
+    "boto3>=1.43.103",
 ]
 
 [dependency-groups]
 dev = [
     "dvc[s3]>=3.67.1",
     "pytest>=9.1.1",
+    "scikit-learn>=1.9.1",
+]
+mlflow-server = [
+    "psycopg[binary]>=3.3.6",
+    "python-dotenv>=1.2.3",
 ]
 
 [tool.pytest.ini_options]
