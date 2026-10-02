@@ -12,6 +12,7 @@ dependencies = [
     "mlflow>=3.16.1",
     "boto3>=1.43.103",
     "scikit-learn>=1.9.1",
+    "pandas>=3.0.6",
 ]
 
 [dependency-groups]

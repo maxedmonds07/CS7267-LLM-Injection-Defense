@@ -1,0 +1,203 @@
+{
+  "class_balance": {
+    "by_attack_surface": {
+      "rag_corpus": {
+        "adversarial": 1500,
+        "adversarial_share": 0.337,
+        "benign": 2955
+      },
+      "tool_description": {
+        "adversarial": 540,
+        "adversarial_share": 0.585,
+        "benign": 383
+      },
+      "tool_output": {
+        "adversarial": 2821,
+        "adversarial_share": 0.501,
+        "benign": 2806
+      }
+    },
+    "by_role": {
+      "loso_holdout": {
+        "adversarial": 485,
+        "adversarial_share": 0.573,
+        "benign": 362
+      },
+      "train_pool": {
+        "adversarial": 4306,
+        "adversarial_share": 0.428,
+        "benign": 5761
+      },
+      "transfer_holdout": {
+        "adversarial": 70,
+        "adversarial_share": 0.769,
+        "benign": 21
+      }
+    },
+    "by_source": {
+      "bipia": {
+        "adversarial": 2806,
+        "adversarial_share": 0.5,
+        "benign": 2806
+      },
+      "mcptox": {
+        "adversarial": 485,
+        "adversarial_share": 0.573,
+        "benign": 362
+      },
+      "msb": {
+        "adversarial": 70,
+        "adversarial_share": 0.769,
+        "benign": 21
+      },
+      "poisonedrag": {
+        "adversarial": 1500,
+        "adversarial_share": 0.337,
+        "benign": 2955
+      }
+    },
+    "by_split": {
+      "test": {
+        "adversarial": 679,
+        "adversarial_share": 0.437,
+        "benign": 876
+      },
+      "train": {
+        "adversarial": 3469,
+        "adversarial_share": 0.441,
+        "benign": 4393
+      },
+      "val": {
+        "adversarial": 713,
+        "adversarial_share": 0.449,
+        "benign": 875
+      }
+    },
+    "overall": {
+      "adversarial": 4861,
+      "adversarial_share": 0.442,
+      "benign": 6144
+    }
+  },
+  "duplicates": {
+    "ids": 0,
+    "texts": 0
+  },
+  "nulls": {
+    "attack_family": {
+      "adversarial": 0,
+      "benign": 6144,
+      "total": 6144
+    },
+    "attack_kind": {
+      "adversarial": 0,
+      "benign": 6144,
+      "total": 6144
+    },
+    "attack_objective": {
+      "adversarial": 0,
+      "benign": 6144,
+      "total": 6144
+    },
+    "attack_surface": {
+      "adversarial": 0,
+      "benign": 0,
+      "total": 0
+    },
+    "group": {
+      "adversarial": 0,
+      "benign": 0,
+      "total": 0
+    },
+    "id": {
+      "adversarial": 0,
+      "benign": 0,
+      "total": 0
+    },
+    "label": {
+      "adversarial": 0,
+      "benign": 0,
+      "total": 0
+    },
+    "role": {
+      "adversarial": 0,
+      "benign": 0,
+      "total": 0
+    },
+    "source": {
+      "adversarial": 0,
+      "benign": 0,
+      "total": 0
+    },
+    "split": {
+      "adversarial": 0,
+      "benign": 0,
+      "total": 0
+    },
+    "subset": {
+      "adversarial": 0,
+      "benign": 0,
+      "total": 0
+    },
+    "text": {
+      "adversarial": 0,
+      "benign": 0,
+      "total": 0
+    }
+  },
+  "shape": {
+    "columns": 12,
+    "rows": 11005
+  },
+  "text_length": {
+    "bipia": {
+      "adversarial": {
+        "max": 7107,
+        "median": 1816.0,
+        "min": 124
+      },
+      "benign": {
+        "max": 7020,
+        "median": 1751.5,
+        "min": 26
+      }
+    },
+    "mcptox": {
+      "adversarial": {
+        "max": 1022,
+        "median": 292.0,
+        "min": 133
+      },
+      "benign": {
+        "max": 2818,
+        "median": 88.0,
+        "min": 32
+      }
+    },
+    "msb": {
+      "adversarial": {
+        "max": 972,
+        "median": 313.5,
+        "min": 67
+      },
+      "benign": {
+        "max": 457,
+        "median": 156.0,
+        "min": 62
+      }
+    },
+    "poisonedrag": {
+      "adversarial": {
+        "max": 414,
+        "median": 183.0,
+        "min": 133
+      },
+      "benign": {
+        "max": 2569,
+        "median": 389.0,
+        "min": 7
+      }
+    }
+  },
+  "unexpected_nulls": {}
+}

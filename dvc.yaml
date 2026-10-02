@@ -58,3 +58,15 @@ stages:
     metrics:
       - data/processed/summary.json:
           cache: false
+
+  profile_dataset:
+    cmd: python src/data/profile_dataset.py
+    deps:
+      - src/data/profile_dataset.py
+      - data/processed/dataset.parquet
+    outs:
+      - data/processed/profile.md:
+          cache: false
+    metrics:
+      - data/processed/profile.json:
+          cache: false

@@ -28,6 +28,7 @@ src/data/
   fetch.py                Download pinned source files into data/raw
   generate_bipia.py       Rebuild BIPIA contexts that upstream does not redistribute
   build_dataset.py        Build the unified labeled table, data/processed/dataset.parquet
+  profile_dataset.py      Profile the table (nulls, class balance, length), data/processed/profile.md
   dataset.py              Load the table, refusing held-out data when fitting
 tests/                    Pytest suite (fixtures only; most tests need no real data)
 mlflow-server/            Shared MLflow tracking server setup (see its README)
@@ -109,6 +110,8 @@ Current build (`data/processed/summary.json`, 11,005 rows, 47 exact duplicates d
 The full design, including per-source construction, the attack-objective mapping and known
 limitations, is in
 [`docs/superpowers/specs/2026-09-29-build-dataset-design.md`](docs/superpowers/specs/2026-09-29-build-dataset-design.md).
+[`DATA_CARD.md`](DATA_CARD.md) is the data card: intended uses, known
+shortcuts and distribution constraints.
 
 ### Loading data
 
@@ -131,7 +134,7 @@ transfer = load("eval", sources=["msb"])    # every MSB row
 
 ```text
 fetch ──────┬──────────────> bipia_summarization ──┐
-            ├──────────────> bipia_webqa ──────────┼──> build_dataset
+            ├──────────────> bipia_webqa ──────────┼──> build_dataset ──> profile_dataset
             │  NewsQA CSV ──────┘                  │
             └──────────────────────────────────────┘
 ```
@@ -140,11 +143,12 @@ fetch ──────┬──────────────> bipia_sum
 |---|---|
 | `make data` | Pull everything from R2, then rebuild stale stages |
 | `uv run dvc repro` | Rebuild stages whose code, params or inputs changed |
-| `uv run dvc metrics diff` | Compare `summary.json` row counts against `main` |
+| `uv run dvc metrics diff` | Compare `summary.json` row counts and `profile.json` against `main` |
 | `make push-data` | Upload new DVC outputs to R2 |
 | `make push-large DVC_FILE=path.dvc` | Upload one large file in small parts (for slow uplinks), then `make push-data` |
 
-After changing a stage, commit `dvc.lock` and `data/processed/summary.json` with the code,
+After changing a stage, commit `dvc.lock`, `data/processed/summary.json` and
+`data/processed/profile.{json,md}` with the code,
 and push the data so teammates can `make data`.
 
 ## Experiment tracking (MLflow)
