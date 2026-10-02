@@ -78,7 +78,7 @@ requirement to the section and repository artifact that addresses it.
 | Download and version raw dataset | §\ref{download-and-versioning}, Figure \ref{fig:pipeline} | `config.yaml`, `dvc.yaml`, `dvc.lock` |
 | Check licensing and IRB | §\ref{licensing-privacy-and-irb} | `DATA_CARD.md` (Distribution, Collection) |
 | Profile: shape, nulls, class balance | §\ref{profile} | `data/processed/profile.md`, `profile.json` |
-| Write a data card | §\ref{data-card}, Appendix \ref{data-card-summary} | `DATA_CARD.md` |
+| Write a data card | §\ref{data-card}, Appendix \ref{data-card-appendix} | `DATA_CARD.md` |
 | Set up data versioning | §\ref{download-and-versioning} | DVC remote on Cloudflare R2 |
 
 Table: Phase 2 requirements and where this report and the repository address them. {#tbl:rubric}
@@ -462,7 +462,7 @@ The corpus is documented in `DATA_CARD.md` at the repository root. It opens with
 summary and per-source table in the style of Data Cards [@pushkarna2022datacards], then
 answers the questions of Datasheets for Datasets [@gebru2021datasheets] on motivation,
 composition, collection, preprocessing, uses, distribution and maintenance.
-Appendix \ref{data-card-summary} reproduces its summary. Besides the facts in this section, the card records
+Appendix \ref{data-card-appendix} reproduces it in full. Besides the facts in this section, the card records
 the intended uses and the uses to avoid: training on held-out sources, measuring
 direct-injection robustness, estimating false positive rates on MCP tool responses (no
 benign ones exist), comparing payload types without stratifying, and building attack
@@ -495,19 +495,6 @@ report were reviewed by the team.
 
 \appendix
 
-# Data card summary
+# Data card {#data-card-appendix}
 
-| Field | Value |
-|:----------------|:------------------------------------------------------------------|
-| Task | Binary classification of untrusted text segments: 1 adversarial (prompt injection or poisoning), 0 benign |
-| Unit | One text segment that reaches an LLM without the user writing it: a retrieved passage, a fetched document, an MCP tool description or a tool response |
-| Size | 11,005 rows: 4,861 adversarial, 6,144 benign (47 exact duplicates dropped) |
-| Surfaces | RAG corpus, tool output, tool description |
-| Sources | PoisonedRAG (+ BEIR), BIPIA, MCPTox, MSB |
-| Held out | MCPTox (unseen surface) and MSB (unseen benchmark) are never trained on |
-| Profile | No unexpected nulls, no duplicate IDs or texts, 44.2% adversarial |
-| Version | `dvc.lock`, dataset MD5 `a1c6426890678d576fb6231dc6050491` (built 2026-09-29) |
-| Storage | Private Cloudflare R2 DVC remote; not redistributed |
-| Full card | `DATA_CARD.md` in the repository |
-
-Table: Summary of the data card. {#tbl:datacard}
+<!-- Filled at build time from DATA_CARD.md (see `make report`); edit the card, not this file. -->

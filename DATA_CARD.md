@@ -11,7 +11,7 @@ Numbers describe the build recorded in `data/processed/summary.json`,
 ## At a glance
 
 | | |
-|---|---|
+|--------------------|--------------------------------------------------------------------------------|
 | **Task** | Binary classification of untrusted text segments: `1` adversarial (prompt injection or poisoning), `0` benign |
 | **Unit** | One text segment that reaches an LLM without the user writing it: a retrieved passage, a fetched document, an MCP tool description or a tool response |
 | **Size** | 11,005 rows: 4,861 adversarial, 6,144 benign (47 exact duplicates dropped) |
@@ -26,7 +26,7 @@ Numbers describe the build recorded in `data/processed/summary.json`,
 ### Sources
 
 | Source | Surface | Role | Adversarial | Benign | Groups | Upstream license |
-|---|---|---|---:|---:|---:|---|
+|---------------|---------------------|-------------------|-----------:|--------:|----------:|----------------|
 | PoisonedRAG + BEIR | `rag_corpus` | `train_pool` | 1,500 | 2,955 | 300 | MIT (BEIR corpora: per-dataset terms) |
 | BIPIA | `tool_output` | `train_pool` | 2,806 | 2,806 | 2,806 | MIT; TableQA CC BY-SA 4.0; NewsQA and XSum terms |
 | MCPTox | `tool_description` | `loso_holdout` | 485 | 362 | 45 | None stated (team-internal copy) |
@@ -58,7 +58,7 @@ The CS 7267 (Machine Learning) project team.
 Each row is one untrusted text segment with its label and provenance. Columns:
 
 | Column | Meaning |
-|---|---|
+|----------------------------|------------------------------------------------------------------------|
 | `id` | Unique; traceable to the source record (for example `mcptox:FileSystem_1`) |
 | `text` | Detector input, stripped of surrounding whitespace |
 | `label` | `1` adversarial, `0` benign |
@@ -120,7 +120,7 @@ train/test boundary (our `val` is 15% of BIPIA train groups), so BIPIA `test` mo
 attack families never seen in training. `role` sits on top of `split`:
 
 | Role | Train | Val | Test | Use |
-|---|---:|---:|---:|---|
+|--------------------|---------:|---------:|---------:|-----------------------------------------------------|
 | `train_pool` | 7,217 | 1,416 | 1,434 | Fit on train, tune on val, report in-distribution on test |
 | `loso_holdout` | 572 | 166 | 109 | Evaluation only; score every row |
 | `transfer_holdout` | 73 | 6 | 12 | Evaluation only; score every row |
@@ -320,7 +320,7 @@ Constraints if that changes:
 ## Maintenance
 
 **Who maintains the dataset, and how can they be contacted?**
-- Adedapo Odeyemi ([@blacng](https://github.com/blacng)), for the CS7267 project team. Open an issue on this repository for questions or problems with the data.
+- Adedapo Odeyemi ([\@blacng](https://github.com/blacng)), for the CS7267 project team. Open an issue on this repository for questions or problems with the data.
 
 
 **Will the dataset be updated?**
