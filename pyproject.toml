@@ -11,6 +11,7 @@ dependencies = [
     "nltk>=3.10.3",
     "mlflow>=3.16.1",
     "boto3>=1.43.103",
+    "pandas>=3.0.6",
 ]
 
 [dependency-groups]
