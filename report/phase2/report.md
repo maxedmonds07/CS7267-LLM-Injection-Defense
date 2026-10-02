@@ -82,15 +82,28 @@ Table: Phase 2 requirements and where this report and the repository address the
 
 ## Corpus and coding protocol
 
-The review set holds 20 papers published between 2023 and 2026, selected for their
-relevance to indirect prompt injection and retrieval poisoning against LLM applications
-that use retrieval, tools or MCP. By primary contribution, 8 are defenses, 4 are
-benchmarks or evaluation environments, 3 are attacks, 1 is an evaluation-methodology
+**Search.** We searched Google Scholar and arXiv and browsed the proceedings of security,
+machine-learning and NLP venues. Queries covered four themes:
+
+- **Prompt injection**: "indirect prompt injection", "prompt injection defense",
+  "prompt injection detection";
+- **RAG poisoning**: "RAG poisoning", "knowledge corruption", "retrieval corpus
+  poisoning";
+- **Agents and MCP**: "MCP security", "tool poisoning", "LLM agent tool injection";
+- **Benchmarks**: "prompt injection benchmark", "agent security benchmark".
+
+**Selection.** Results were screened on title and abstract, and the full text of each
+candidate was read before inclusion. A paper was included if it (i) studies indirect
+prompt injection or retrieval poisoning against an LLM application that uses retrieval,
+tools or MCP, as an attack, a defense, a benchmark or an evaluation method; (ii) was
+published or posted between 2023 and 2026; and (iii) is written in English with the full
+text available. arXiv preprints were eligible; their venue and year were verified before
+citing. Papers that did not meet all three criteria were excluded.
+
+**Corpus.** The review set holds 20 papers. By primary contribution, 8 are defenses, 4
+are benchmarks or evaluation environments, 3 are attacks, 1 is an evaluation-methodology
 paper, and 4 combine contributions (for example a benchmark and a defense). Twelve are
 rated highly relevant to our research question.
-
-<!-- TODO(team): add the search strategy here: databases and venues searched, query
-strings, date range, and the inclusion and exclusion criteria. -->
 
 Each paper is coded as one row of a shared coding matrix. The frame records, among other
 dimensions:
