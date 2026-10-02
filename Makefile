@@ -97,6 +97,8 @@ $(NEWSQA_CACHE)/cnn_stories.tgz:
 
 REPORT_DIR := report/phase2
 
+# Appendix A of the report is DATA_CARD.md without its title line, read from stdin after report.md.
 report: ## Build the Phase 2 report PDF with pandoc and tectonic
-	cd $(REPORT_DIR) && pandoc report.md --citeproc --pdf-engine=tectonic -H header.tex -o report.pdf
+	cd $(REPORT_DIR) && tail -n +2 ../../DATA_CARD.md | pandoc -f markdown+lists_without_preceding_blankline report.md - --citeproc \
+		--lua-filter=repo-links.lua --pdf-engine=tectonic -H header.tex -o report.pdf
 	@echo "Wrote $(REPORT_DIR)/report.pdf"
