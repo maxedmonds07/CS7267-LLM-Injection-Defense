@@ -13,7 +13,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: help install r2-remote r2-credentials check-remote data push-data push-large newsqa
+.PHONY: help install r2-remote r2-credentials check-remote data push-data push-large newsqa report
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -94,3 +94,9 @@ $(NEWSQA_CACHE)/cnn_stories.tgz:
 	$(require_terms)
 	mkdir -p $(@D)
 	uvx gdown@6.4.0 $(CNN_STORIES_DRIVE_ID) -O $@.part && mv $@.part $@
+
+REPORT_DIR := report/phase2
+
+report: ## Build the Phase 2 report PDF with pandoc and tectonic
+	cd $(REPORT_DIR) && pandoc report.md --citeproc --pdf-engine=tectonic -H header.tex -o report.pdf
+	@echo "Wrote $(REPORT_DIR)/report.pdf"

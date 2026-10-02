@@ -47,7 +47,7 @@ holdouts.
 
 **Who created the dataset, and on behalf of which entity?**
 The CS 7267 (Machine Learning) project team.
-- Carter Corbin, Max Edmonds, Mohammed Adil Admed, Oluwamayowa Adewummi, Adedapo Odeyemi
+- Carter Corbin, Max Edmonds, Mohammed Adil Ahmed, Oluwamayowa Adewummi, Adedapo Odeyemi
 
 **Who funded the creation of the dataset?**
 - None

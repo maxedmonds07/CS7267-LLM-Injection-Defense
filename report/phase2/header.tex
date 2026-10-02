@@ -1,0 +1,28 @@
+% Preamble additions for the Phase 2 report (pandoc -H header.tex).
+\usepackage{microtype}
+\usepackage{etoolbox}
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, skip=6pt}
+\captionsetup[table]{position=above}
+
+% Tables: smaller type, a little more row height, ragged cells.
+\AtBeginEnvironment{longtable}{\small\renewcommand{\arraystretch}{1.25}}
+\usepackage{array}
+
+% Running header.
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\textsc{CS 7267} \textperiodcentered{} Phase 2 Report}
+\rhead{\small Prompt Injection Across RAG and MCP Surfaces}
+\cfoot{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{\fancyhf{}\cfoot{\small\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% Pipeline figure.
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit}
+
+% Keep figures near their text.
+\usepackage{float}
+\floatplacement{figure}{htbp}
