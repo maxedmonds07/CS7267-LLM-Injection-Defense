@@ -4,7 +4,7 @@ subtitle: "Phase 2 Report: Literature Review and Data Acquisition"
 author:
   - Carter Corbin
   - Max Edmonds
-  - Mohammed Adil Admed
+  - Mohammed Adil Ahmed
   - Oluwamayowa Adewummi
   - Adedapo Odeyemi
 date: "CS 7267 Machine Learning · October 2026"
