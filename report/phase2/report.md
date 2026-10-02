@@ -96,7 +96,7 @@ private DVC remote and is not redistributed, because some upstream sources forbi
 ## Corpus and coding protocol
 
 **Search.** We searched Google Scholar and arXiv and browsed the proceedings of security,
-machine-learning and NLP venues. Queries covered four themes:
+machine-learning and NLP workshops and conferences. Queries covered four themes:
 
 - **Prompt injection**: "indirect prompt injection", "prompt injection defense",
   "prompt injection detection";
