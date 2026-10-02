@@ -7,7 +7,12 @@ author:
   - Mohammed Adil Ahmed
   - Oluwamayowa Adewummi
   - Adedapo Odeyemi
-date: "CS 7267 Machine Learning · October 2026"
+date: |
+  ```{=latex}
+  \vspace{-0.6em}College of Computing and Software Engineering\\
+  Kennesaw State University, Kennesaw, GA\\[1.2em]
+  CS 7267 Machine Learning \textperiodcentered{} October 2026
+  ```
 abstract: |
   LLM applications increasingly read text that their users never wrote: passages retrieved
   for retrieval-augmented generation (RAG), documents fetched by tools, and the descriptions
