@@ -83,6 +83,14 @@ requirement to the section and repository artifact that addresses it.
 
 Table: Phase 2 requirements and where this report and the repository address them. {#tbl:rubric}
 
+**Code and data availability.** The repository paths in Table \ref{tbl:rubric} refer to
+the project's public repository,
+<https://github.com/maxedmonds07/CS7267-LLM-Injection-Defense>. It holds the code, the
+literature coding matrix and bibliography, the data card, and the DVC pipeline that
+rebuilds the dataset from its pinned upstream sources. The dataset itself is stored in a
+private DVC remote and is not redistributed, because some upstream sources forbid it
+(§\ref{licensing-privacy-and-irb}).
+
 # Literature Review
 
 ## Corpus and coding protocol
