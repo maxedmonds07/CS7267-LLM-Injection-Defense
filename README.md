@@ -34,6 +34,8 @@ tests/                    Pytest suite (fixtures only; most tests need no real d
 mlflow-server/            Shared MLflow tracking server setup (see its README)
 mlflow-demo/              Minimal example of logging a run to MLflow
 docs/superpowers/         Design specs and implementation plans
+literature-review/        Coding matrix, generated tables (make_tables.py) and BibTeX
+report/phase2/            Phase 2 report source (pandoc + tectonic): `make report`
 scripts/                  Helpers, e.g. multipart upload for large DVC files
 ```
 
