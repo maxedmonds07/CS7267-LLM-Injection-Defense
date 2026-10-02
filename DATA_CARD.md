@@ -1,9 +1,10 @@
 # Data card: CS7267 Untrusted-Segment Injection Dataset
 
 This data card describes the corpus built for the project. It opens with a summary and a
-per-source table in the style of Data Cards (Pushkarna et al., FAccT 2022), then answers the
-questions of Gebru et al.,
-[*Datasheets for Datasets*](https://arxiv.org/abs/1803.09010) (CACM 2021), section by section.
+per-source table in the style of Pushkarna et al.,
+[*Data Cards*](https://doi.org/10.1145/3531146.3533231) (FAccT 2022), then answers the
+questions of Gebru et al., [*Datasheets for Datasets*](https://doi.org/10.1145/3458723)
+(CACM 2021), section by section.
 
 Numbers describe the build recorded in `data/processed/summary.json`,
 `data/processed/profile.md` and `dvc.lock`.
