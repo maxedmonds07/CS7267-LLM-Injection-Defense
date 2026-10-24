@@ -1,0 +1,9 @@
+# Title page for the Phase 3 EDA PDF. The title comes from the write-up's top heading.
+subtitle: "Detecting Prompt Injection Across RAG and MCP Surfaces"
+author:
+  - Carter Corbin
+  - Max Edmonds
+  - Mohammed Adil Ahmed
+  - Oluwamayowa Adewummi
+  - Adedapo Odeyemi
+date: "CS 7267 Machine Learning · October 2026"

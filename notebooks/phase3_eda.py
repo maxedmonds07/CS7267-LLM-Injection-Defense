@@ -12,7 +12,8 @@ Run from the repository root, after ``data/processed/dataset.parquet`` exists:
     uv run python notebooks/phase3_eda.py
 
 Figures land in ``notebooks/figures/``. The write-up is
-``notebooks/PHASE3_VISUAL_DATA.md``.
+``notebooks/PHASE3_VISUAL_DATA.md``; ``make eda-report`` renders it to
+``report/phase3/eda.pdf``.
 """
 
 from __future__ import annotations
