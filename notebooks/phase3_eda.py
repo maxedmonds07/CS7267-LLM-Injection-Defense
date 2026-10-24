@@ -87,10 +87,10 @@ def load_frame() -> pd.DataFrame:
     df["avg_word_len"] = [
         (sum(len(w) for w in ws) / len(ws)) if ws else 0.0 for ws in words
     ]
-    letters = text.str.len().replace(0, np.nan)
-    df["punct_rate"] = text.str.count(r"[^\w\s]") / letters
-    df["upper_rate"] = text.str.count(r"[A-Z]") / letters
-    df["digit_rate"] = text.str.count(r"\d") / letters
+    chars = text.str.len().replace(0, np.nan)
+    df["punct_rate"] = text.str.count(r"[^\w\s]") / chars
+    df["upper_rate"] = text.str.count(r"[A-Z]") / chars
+    df["digit_rate"] = text.str.count(r"\d") / chars
     df["label_name"] = df["label"].map({0: "benign", 1: "adversarial"})
     return df
 
@@ -261,37 +261,41 @@ def plot_missing(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def plot_outliers(df: pd.DataFrame) -> pd.DataFrame:
+    # Fences on log10 length. Length is right-skewed, so a raw-length low fence falls below
+    # zero and can never flag the short fragments.
     records = []
-    flagged = pd.Series(False, index=df.index)
+    log_len = np.log10(df["char_len"])
     for source, part in df.groupby("source"):
-        q1, q3 = part["char_len"].quantile([0.25, 0.75])
+        values = log_len.loc[part.index]
+        q1, q3 = values.quantile([0.25, 0.75])
         iqr = q3 - q1
         low, high = q1 - 1.5 * iqr, q3 + 1.5 * iqr
-        mask = (part["char_len"] < low) | (part["char_len"] > high)
-        flagged.loc[part.index] = mask.to_numpy()
+        below, above = values < low, values > high
+        mask = below | above
         records.append(
             {
                 "source": source,
                 "rows": int(len(part)),
                 "outliers": int(mask.sum()),
                 "outlier_share": float(mask.mean()),
-                "fence_low": float(low),
-                "fence_high": float(high),
-                "min": int(part["char_len"].min()),
-                "max": int(part["char_len"].max()),
+                "below": int(below.sum()),
+                "below_benign": int((below & part["label"].eq(0)).sum()),
+                "above": int(above.sum()),
+                "above_benign": int((above & part["label"].eq(0)).sum()),
+                "fence_low": float(10**low),
+                "fence_high": float(10**high),
             }
         )
     summary = pd.DataFrame(records).sort_values("source")
 
     order = ["bipia", "poisonedrag", "mcptox", "msb"]
     fig, ax = plt.subplots(figsize=(9, 5))
-    data = [df.loc[df["source"].eq(source), "char_len"] for source in order]
+    data = [log_len[df["source"].eq(source)] for source in order]
     box = ax.boxplot(data, tick_labels=order, showfliers=True, patch_artist=True)
     for patch in box["boxes"]:
         patch.set_facecolor("#D8DEE9")
-    ax.set_yscale("log")
-    ax.set_ylabel("characters (log scale)")
-    ax.set_title("Character length by source. Points past the whiskers are 1.5-IQR outliers.")
+    ax.set_ylabel("log10(characters)")
+    ax.set_title("Log character length by source. Points past the whiskers are 1.5-IQR outliers.")
     fig.tight_layout()
     _save(fig, "05_length_outliers.png")
     return summary
@@ -342,6 +346,7 @@ def plot_insight(df: pd.DataFrame) -> dict[str, dict[str, float]]:
             ax.axvline(np.log10(median), color=color, linestyle="--", linewidth=1)
         ax.set_title(source)
         ax.set_xlabel("log10(characters)")
+        ax.tick_params(labelbottom=True)
     axes[0, 0].legend(frameon=False)
     fig.suptitle(
         "The same cue points opposite ways: poisoned passages are shorter, injected tool text is longer",
@@ -366,9 +371,32 @@ def write_report(df: pd.DataFrame, corr: dict, missing: pd.DataFrame, outliers: 
     for source, stats in corr["by_source"].iterrows():
         by_source_rows.append([source, f"{stats['log_char_len']:+.2f}", f"{medians[source].get('benign', float('nan')):,.0f}", f"{medians[source].get('adversarial', float('nan')):,.0f}"])
     outlier_rows = [
-        [r.source, f"{r.outliers:,}", f"{r.outlier_share:.1%}", f"{r.min:,}", f"{r.max:,.0f}"]
+        [
+            r.source,
+            f"{r.outliers:,}",
+            f"{r.outlier_share:.1%}",
+            f"{r.below:,} ({r.below_benign:,} benign)",
+            f"{r.above:,} ({r.above_benign:,} benign)",
+            f"{r.fence_low:,.0f} to {r.fence_high:,.0f}",
+        ]
         for r in outliers.itertuples()
     ]
+    rag_fragments = outliers.set_index("source").loc["poisonedrag"]
+    shortest = df.loc[df["source"].eq("poisonedrag")].nsmallest(4, "char_len")["text"]
+    shortest_quoted = ", ".join(f"`{t}`" for t in shortest)
+
+    subset_sizes = df["subset"].value_counts()
+    small = subset_sizes[subset_sizes < 100]
+    small_sources = " and ".join(sorted(df.loc[df["subset"].isin(small.index), "source"].unique()))
+
+    families = df.loc[df["label"].eq(1)].groupby("attack_family")["source"].first().value_counts()
+    family_split = ", ".join(f"{n} from {s}" for s, n in families.items())
+
+    pool = df.loc[df["role"].eq("train_pool") & df["split"].eq("train")]
+    pool_rho = float(spearmanr(pool["char_len"], pool["label"]).statistic)
+    pool_by_source = pool.groupby("source").agg(adv=("label", "mean"), median=("char_len", "median"))
+    rag_rho = float(corr["by_source"].loc["poisonedrag", "log_char_len"])
+    bipia, rag = pool_by_source.loc["bipia"], pool_by_source.loc["poisonedrag"]
     missing_rows = [
         [r.column, f"{r.nulls:,}", f"{r.nulls_on_benign:,}", f"{r.nulls_on_adversarial:,}"]
         for r in missing.sort_values("column").itertuples()
@@ -384,15 +412,15 @@ Figures for the unified corpus in `data/processed/dataset.parquet`: {len(df):,} 
 
 ![Categorical distributions](figures/01_categorical_distributions.png)
 
-`subset` has 60 values. Eight collections hold almost all of the rows. The rest are individual MCP tool servers, each with a few dozen rows, so they are counted in the caption rather than drawn as sixty bars.
+`subset` has {len(subset_sizes)} values. {len(subset_sizes) - len(small)} collections hold almost all of the rows. The other {len(small)} are individual MCP tool servers from {small_sources}, with {small.min()} to {small.max()} rows each ({small.sum():,} in total), so they are counted in the caption rather than drawn as {len(subset_sizes)} bars.
 
 ![Large subsets](figures/01b_subset.png)
 
-Attack family, counted on adversarial rows only. Benign rows leave this field empty on purpose. PoisonedRAG is one family of 1,500 rows; the long tail is BIPIA's attack categories.
+Attack family, counted on adversarial rows only. Benign rows leave this field empty on purpose. PoisonedRAG is one family of {int(df["attack_family"].eq("poisonedrag").sum()):,} rows. The {int(families.sum())} families split {family_split}. Apart from PoisonedRAG, the named bars are all BIPIA categories; the MCPTox and MSB attack templates are in the "other" bar.
 
 ![Attack family](figures/01c_attack_family.png)
 
-Text statistics, pooled. Pooling hides the pattern in the last figure: a single histogram of length looks almost the same for both classes because PoisonedRAG and the tool sources pull in opposite directions.
+Text statistics, pooled. Pooling hides the pattern in the last figure: a single histogram of length looks almost the same for both classes. The tool sources are too small to cause that. The cancellation is between BIPIA and PoisonedRAG, which make up the whole training pool (see the last section).
 
 ![Numeric distributions](figures/02_numeric_distributions.png)
 
@@ -420,11 +448,13 @@ A model that is allowed to see `attack_kind` can read the label off the missingn
 
 ## Outliers
 
-An outlier is a character length outside the 1.5-IQR fences of its own source. The long BIPIA documents are real emails, articles and tables, not broken rows. PoisonedRAG's adversarial texts are short because the attack writes a short passage, not because those rows are corrupt.
+An outlier is a log character length outside the 1.5-IQR fences of its own source. The fences use log length because length is right-skewed: on raw length the low fence falls below zero and no short text can ever be flagged.
 
 ![Length outliers](figures/05_length_outliers.png)
 
-{_md_table(["Source", "Outlier rows", "Share", "Shortest", "Longest"], outlier_rows)}
+{_md_table(["Source", "Outlier rows", "Share", "Below low fence", "Above high fence", "Fences (characters)"], outlier_rows)}
+
+The short BIPIA rows are real: brief answers to coding questions and one-line news captions, with and without an inserted attack. The short PoisonedRAG rows are not passages. All {int(rag_fragments.below)} are benign fragments of the retrieval corpus, such as {shortest_quoted}: table cells, list items and headings that the passage split left on their own. They are not corrupt and are too few to move the benign median, but they are a cue a detector could learn: every PoisonedRAG text shorter than {rag_fragments.fence_low:,.0f} characters is benign. The short MSB rows are one-line tool descriptions.
 
 ## Target
 
@@ -440,7 +470,9 @@ On PoisonedRAG the adversarial passages sit to the left of the benign retrieved 
 
 ![Length reversal](figures/07_length_reversal.png)
 
-That is why a length-only model fit on the pooled training set looks useless in-distribution and then looks strong on MCPTox and MSB. It learned one direction and the held-out tool descriptions happen to match that direction, while PoisonedRAG matches the other one. Any detector score has to be compared with length inside each source. The numbers for that comparison are already in `DATA_CARD.md`, from `src/models/baselines.py`.
+The pooled training set (`train_pool`, train split) is only BIPIA and PoisonedRAG, and its Spearman correlation between length and label is {pool_rho:+.2f}. Two effects cancel. Inside PoisonedRAG, adversarial passages are shorter ({rag_rho:+.2f}). Between the sources, the longer one has more attacks: BIPIA has a median of {bipia["median"]:,.0f} characters and is {bipia["adv"]:.0%} adversarial, while PoisonedRAG has a median of {rag["median"]:,.0f} and is {rag["adv"]:.0%} adversarial. This is Simpson's paradox: the pooled trend is set by which source a row comes from, not by what length does inside a source.
+
+That is why a length-only model fit on the pooled training set looks useless in-distribution and then looks strong on MCPTox and MSB. The between-source effect teaches it that longer means adversarial. The held-out tool descriptions happen to match that direction, while PoisonedRAG, inside itself, runs the other way. Any detector score has to be compared with length inside each source. The numbers for that comparison are already in `DATA_CARD.md`, from `src/models/baselines.py`.
 """
     WRITEUP.write_text(text)
 

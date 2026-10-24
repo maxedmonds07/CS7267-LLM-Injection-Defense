@@ -8,15 +8,15 @@ Figures for the unified corpus in `data/processed/dataset.parquet`: 11,005 rows,
 
 ![Categorical distributions](figures/01_categorical_distributions.png)
 
-`subset` has 60 values. Eight collections hold almost all of the rows. The rest are individual MCP tool servers, each with a few dozen rows, so they are counted in the caption rather than drawn as sixty bars.
+`subset` has 60 values. 8 collections hold almost all of the rows. The other 52 are individual MCP tool servers from mcptox and msb, with 2 to 58 rows each (938 in total), so they are counted in the caption rather than drawn as 60 bars.
 
 ![Large subsets](figures/01b_subset.png)
 
-Attack family, counted on adversarial rows only. Benign rows leave this field empty on purpose. PoisonedRAG is one family of 1,500 rows; the long tail is BIPIA's attack categories.
+Attack family, counted on adversarial rows only. Benign rows leave this field empty on purpose. PoisonedRAG is one family of 1,500 rows. The 89 families split 49 from bipia, 32 from mcptox, 7 from msb, 1 from poisonedrag. Apart from PoisonedRAG, the named bars are all BIPIA categories; the MCPTox and MSB attack templates are in the "other" bar.
 
 ![Attack family](figures/01c_attack_family.png)
 
-Text statistics, pooled. Pooling hides the pattern in the last figure: a single histogram of length looks almost the same for both classes because PoisonedRAG and the tool sources pull in opposite directions.
+Text statistics, pooled. Pooling hides the pattern in the last figure: a single histogram of length looks almost the same for both classes. The tool sources are too small to cause that. The cancellation is between BIPIA and PoisonedRAG, which make up the whole training pool (see the last section).
 
 ![Numeric distributions](figures/02_numeric_distributions.png)
 
@@ -53,16 +53,18 @@ A model that is allowed to see `attack_kind` can read the label off the missingn
 
 ## Outliers
 
-An outlier is a character length outside the 1.5-IQR fences of its own source. The long BIPIA documents are real emails, articles and tables, not broken rows. PoisonedRAG's adversarial texts are short because the attack writes a short passage, not because those rows are corrupt.
+An outlier is a log character length outside the 1.5-IQR fences of its own source. The fences use log length because length is right-skewed: on raw length the low fence falls below zero and no short text can ever be flagged.
 
 ![Length outliers](figures/05_length_outliers.png)
 
-| Source | Outlier rows | Share | Shortest | Longest |
-|---|---|---|---|---|
-| bipia | 14 | 0.2% | 26 | 7,107 |
-| mcptox | 35 | 4.1% | 32 | 2,818 |
-| msb | 1 | 1.1% | 62 | 972 |
-| poisonedrag | 178 | 4.0% | 7 | 2,569 |
+| Source | Outlier rows | Share | Below low fence | Above high fence | Fences (characters) |
+|---|---|---|---|---|---|
+| bipia | 92 | 1.6% | 92 (69 benign) | 0 (0 benign) | 311 to 9,374 |
+| mcptox | 2 | 0.2% | 0 (0 benign) | 2 (2 benign) | 16 to 2,219 |
+| msb | 3 | 3.3% | 3 (3 benign) | 0 (0 benign) | 67 to 1,473 |
+| poisonedrag | 50 | 1.1% | 48 (48 benign) | 2 (2 benign) | 39 to 2,336 |
+
+The short BIPIA rows are real: brief answers to coding questions and one-line news captions, with and without an inserted attack. The short PoisonedRAG rows are not passages. All 48 are benign fragments of the retrieval corpus, such as `Side A:`, `Side B:`, `(At 0:38)`, `7" single`: table cells, list items and headings that the passage split left on their own. They are not corrupt and are too few to move the benign median, but they are a cue a detector could learn: every PoisonedRAG text shorter than 39 characters is benign. The short MSB rows are one-line tool descriptions.
 
 ## Target
 
@@ -78,4 +80,6 @@ On PoisonedRAG the adversarial passages sit to the left of the benign retrieved 
 
 ![Length reversal](figures/07_length_reversal.png)
 
-That is why a length-only model fit on the pooled training set looks useless in-distribution and then looks strong on MCPTox and MSB. It learned one direction and the held-out tool descriptions happen to match that direction, while PoisonedRAG matches the other one. Any detector score has to be compared with length inside each source. The numbers for that comparison are already in `DATA_CARD.md`, from `src/models/baselines.py`.
+The pooled training set (`train_pool`, train split) is only BIPIA and PoisonedRAG, and its Spearman correlation between length and label is +0.02. Two effects cancel. Inside PoisonedRAG, adversarial passages are shorter (-0.56). Between the sources, the longer one has more attacks: BIPIA has a median of 1,833 characters and is 50% adversarial, while PoisonedRAG has a median of 253 and is 34% adversarial. This is Simpson's paradox: the pooled trend is set by which source a row comes from, not by what length does inside a source.
+
+That is why a length-only model fit on the pooled training set looks useless in-distribution and then looks strong on MCPTox and MSB. The between-source effect teaches it that longer means adversarial. The held-out tool descriptions happen to match that direction, while PoisonedRAG, inside itself, runs the other way. Any detector score has to be compared with length inside each source. The numbers for that comparison are already in `DATA_CARD.md`, from `src/models/baselines.py`.
