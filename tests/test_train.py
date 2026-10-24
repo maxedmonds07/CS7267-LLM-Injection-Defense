@@ -1,0 +1,50 @@
+"""The training CLI: fit, compare with the length baseline, log to MLflow when asked."""
+
+import math
+
+import mlflow
+import pandas as pd
+
+from train import EXPERIMENT, TFIDF_C_GRID, compare, fit_detector, main, metric_items
+from harness import load_data
+
+
+def test_tfidf_picks_c_from_the_grid(dataset_path):
+    detector, params = fit_detector("tfidf", load_data(dataset_path))
+    assert detector.name == "tfidf"
+    assert params["C"] in TFIDF_C_GRID
+    assert 0.0 <= params["val_auroc"] <= 1.0
+
+
+def test_metric_keys_skip_nan():
+    report = pd.DataFrame(
+        [{"eval_set": "msb", "slice": "attack_surface=tool_output", "auroc": math.nan, "tpr": 0.8, "fpr":
+          math.nan}]
+    )
+    assert metric_items(report) == {"tpr/msb/attack_surface-tool_output": 0.8}
+
+
+def test_compare_puts_length_next_to_the_detector():
+    report = pd.DataFrame([{"eval_set": "mcptox", "slice": "all", "auroc": 0.9, "tpr": 0.5}])
+    reference = pd.DataFrame([{"eval_set": "mcptox", "slice": "all", "auroc": 0.77, "tpr": 0.1}])
+    row = compare(report, reference).iloc[0]
+    assert (row.auroc, row.auroc_length, row.tpr, row.tpr_length) == (0.9, 0.77, 0.5, 0.1)
+
+
+def test_runs_without_tracking(dataset_path, capsys, monkeypatch):
+    monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
+    report = main(["--detector", "length", "--data", str(dataset_path), "--n-boot", "20"])
+    assert set(report.detector) == {"length_only"}
+    assert "not logged to MLflow" in capsys.readouterr().out
+
+
+def test_logs_a_run(dataset_path, tmp_path, monkeypatch):
+    # With a SQLite backend MLflow writes artifacts to ./mlruns; keep them out of the repo.
+    monkeypatch.chdir(tmp_path)
+    uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    main(["--detector", "tfidf", "--data", str(dataset_path), "--n-boot", "20", "--tracking-uri", uri])
+    mlflow.set_tracking_uri(uri)
+    runs = mlflow.search_runs(experiment_names=[EXPERIMENT])
+    assert len(runs) == 1
+    assert runs.loc[0, "params.detector"] == "tfidf"
+    assert runs.loc[0, "metrics.auroc/mcptox/all"] == 1.0
