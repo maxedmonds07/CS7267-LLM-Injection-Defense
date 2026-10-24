@@ -1,0 +1,36 @@
+% Preamble additions for the Phase 3 EDA PDF (pandoc -H header.tex).
+\usepackage{microtype}
+\usepackage{etoolbox}
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, skip=6pt}
+
+% Tables: smaller type, a little more row height.
+\AtBeginEnvironment{longtable}{\small\renewcommand{\arraystretch}{1.25}}
+
+% Running header.
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\textsc{CS 7267} \textperiodcentered{} Phase 3 Visual Data}
+\rhead{\small Prompt Injection Across RAG and MCP Surfaces}
+\cfoot{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancypagestyle{plain}{\fancyhf{}\cfoot{\small\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% Keep each figure exactly where the text puts it. Floating them (htbp) let tall figures
+% push text past the page bottom and away from the paragraph that describes them.
+\usepackage{float}
+\floatplacement{figure}{H}
+
+% Cap figure height so two figures can share a page. Same as pandoc's \pandocbounded
+% (pandoc 3), with 0.4\textheight in place of \textheight.
+\makeatletter
+\renewcommand*\pandocbounded[1]{%
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{0.4\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi}
+\makeatother
