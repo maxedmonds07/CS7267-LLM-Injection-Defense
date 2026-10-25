@@ -20,6 +20,11 @@ dev = [
     "dvc[s3]>=3.67.1",
     "pytest>=9.1.1",
 ]
+perplexity = [
+    "torch>=2.4,<3",
+    "tqdm>=4.70.1",
+    "transformers>=4.46,<5",
+]
 mlflow-server = [
     "psycopg[binary]>=3.3.6",
     "python-dotenv>=1.2.3",

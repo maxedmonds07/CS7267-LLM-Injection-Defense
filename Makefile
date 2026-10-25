@@ -1,3 +1,9 @@
+ifeq ($(OS),Windows_NT)
+    export PYTHONPATH := src/data;src/eval;src/models
+else
+    export PYTHONPATH := src/data:src/eval:src/models
+endif
+
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
@@ -113,5 +119,7 @@ eda-report: ## Build the Phase 3 EDA PDF from notebooks/PHASE3_VISUAL_DATA.md
 
 DETECTOR ?= tfidf
 # Logs to MLflow when MLFLOW_TRACKING_URI is set (start the team server first; see README).
-evaluate: ## Fit and evaluate a detector next to the length baseline: make evaluate DETECTOR=tfidf
-PYTHONPATH=src/data:src/eval:src/models uv run python src/models/train.py --detector $(DETECTOR)
+UV_GROUP = $(if $(filter perplexity,$(DETECTOR)),--group perplexity,)
+
+evaluate: ## Fit and evaluate the selected detector
+	uv run $(UV_GROUP) python src/models/train.py --detector $(DETECTOR)

@@ -3,8 +3,10 @@
 import math
 
 import mlflow
+import numpy as np
 import pandas as pd
 
+import train
 from train import EXPERIMENT, TFIDF_C_GRID, compare, fit_detector, main, metric_items
 from harness import load_data
 
@@ -14,6 +16,25 @@ def test_tfidf_picks_c_from_the_grid(dataset_path):
     assert detector.name == "tfidf"
     assert params["C"] in TFIDF_C_GRID
     assert 0.0 <= params["val_auroc"] <= 1.0
+
+
+def test_perplexity_uses_frozen_model_without_fit(dataset_path):
+    model, params = fit_detector("perplexity", load_data(dataset_path))
+    assert model.name == "perplexity_b0"
+    assert model._model is None
+    assert params["model_name"] == "distilbert/distilgpt2"
+
+
+def test_perplexity_uses_the_same_harness(dataset_path, monkeypatch):
+    # Stub the expensive model inference; this verifies training/evaluation plumbing.
+    monkeypatch.setattr(
+        train.PerplexityDetector,
+        "predict_proba",
+        lambda self, texts: np.array([float("ignore previous" in t) for t in texts]),
+    )
+    report = main(["--detector", "perplexity", "--data", str(dataset_path), "--n-boot", "20"])
+    assert set(report.detector) == {"perplexity_b0"}
+    assert set(report.eval_set) == {"test", "mcptox", "msb"}
 
 
 def test_metric_keys_skip_nan():

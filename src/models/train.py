@@ -20,6 +20,7 @@ from baselines import LengthBaseline
 from dataset import DEFAULT_PATH
 from harness import evaluate, load_data
 from metrics import auroc
+from perplexity import PerplexityDetector
 from tfidf import TfidfDetector
 
 EXPERIMENT = "phase3-detectors"
@@ -28,10 +29,21 @@ SHOWN = ["eval_set", "slice", "n_benign", "n_adversarial", "auroc", "auroc_lo", 
          "tpr", "tpr_length", "fpr"]
 
 
-def fit_detector(name, data):
-    """Fit on train_pool train. TF-IDF picks its regularization C by val AUROC."""
+def fit_detector(name, data, *, ppl_model="distilbert/distilgpt2", ppl_max_context=512,
+                 ppl_stride=256, ppl_device=None):
+    """Fit on train_pool train; B0 perplexity uses a frozen pretrained LM."""
     if name == "length":
         return LengthBaseline().fit(data.train.text, data.train.label), {}
+    if name == "perplexity":
+        model = PerplexityDetector(
+            model_name=ppl_model, max_context=ppl_max_context,
+            stride=ppl_stride, device=ppl_device,
+        ).fit(data.train.text, data.train.label)
+        return model, {
+            "model_name": ppl_model, "max_context": ppl_max_context, "stride": ppl_stride,
+        }
+    if name != "tfidf":
+        raise ValueError(f"Unknown detector: {name}")
     fitted = [TfidfDetector(C=c).fit(data.train.text, data.train.label) for c in TFIDF_C_GRID]
     val_aurocs = [auroc(model.predict_proba(data.val.text), data.val.label) for model in fitted]
     best = int(np.argmax(val_aurocs))
@@ -81,7 +93,14 @@ def log_run(uri, name, params, threshold, args, report, detector):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--detector", choices=["length", "tfidf"], required=True)
+    parser.add_argument("--detector", choices=["length", "tfidf", "perplexity"], required=True)
+    parser.add_argument("--ppl-model", default="distilbert/distilgpt2",
+                        help="Frozen causal language model for B0 perplexity")
+    parser.add_argument("--ppl-max-context", type=int, default=512,
+                        help="Tokens per perplexity scoring window")
+    parser.add_argument("--ppl-stride", type=int, default=256,
+                        help="New tokens scored in each window")
+    parser.add_argument("--ppl-device", default=None, help="cpu or cuda (default: auto)")
     parser.add_argument("--data", default=str(DEFAULT_PATH), help="dataset.parquet to read")
     parser.add_argument("--target-fpr", type=float, default=0.01)
     parser.add_argument("--n-boot", type=int, default=1000)
@@ -89,7 +108,11 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     data = load_data(args.data)
-    detector, params = fit_detector(args.detector, data)
+    detector, params = fit_detector(
+        args.detector, data, ppl_model=args.ppl_model,
+        ppl_max_context=args.ppl_max_context, ppl_stride=args.ppl_stride,
+        ppl_device=args.ppl_device,
+    )
     threshold, report = evaluate(detector, data, args.target_fpr, args.n_boot)
     if args.detector == "length":
         shown = report.assign(auroc_length=report.auroc, tpr_length=report.tpr)

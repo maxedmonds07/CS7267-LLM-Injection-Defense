@@ -169,6 +169,35 @@ The report has AUROC with a 95% bootstrap interval, and TPR and FPR at the thres
 FPR is blank where a slice has no benign rows (MSB `tool_output`). The shared code is
 `src/eval/harness.py`; detectors live in `src/models/`.
 
+### B0: perplexity
+
+The frozen DistilGPT2 language model scores each text by its perplexity. Larger perplexity
+is considered more suspicious. It is **not trained on attack labels**. Like TF-IDF, it uses
+benign validation scores to choose the fixed 1% FPR threshold, then evaluates on the same
+test and held-out datasets. For long inputs it uses overlapping context windows, so that
+every token contributes to the score. `predict_proba` is a monotonic anomaly score, **not**
+a calibrated probability that the text is an attack.
+
+Install the optional model dependencies and evaluate:
+
+```bash
+uv sync --group perplexity
+make evaluate DETECTOR=perplexity
+```
+
+The pretrained model weights are downloaded from Hugging Face on first use. Scoring the
+full dataset on CPU may take considerable time. The detector also accepts `--ppl-model`,
+`--ppl-device`, `--ppl-max-context`, and `--ppl-stride` options when running `train.py`.
+On native Windows PowerShell, configure the import paths and run the script directly:
+
+```powershell
+$env:PYTHONPATH = "src/data;src/eval;src/models"
+uv run --group perplexity python src/models/train.py --detector perplexity
+```
+
+This is a standard causal-LM perplexity detector, not an exact reproduction of the
+PoisonedRAG paper's `cl100k_base`-based scoring procedure.
+
 ## Experiment tracking (MLflow)
 
 Everyone runs MLflow locally, backed by one shared Neon PostgreSQL database and one object
