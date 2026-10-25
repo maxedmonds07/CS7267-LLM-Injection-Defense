@@ -133,7 +133,6 @@ class PerplexityDetector:
     def predict_proba(self, texts) -> np.ndarray:
         """Return monotonically scaled perplexity scores (not calibrated probabilities)."""
         log_ppl = np.array([self.log_perplexity(str(text)) 
-                            for text in tqdm(texts, desc="Calculating Perplexity", 
-                                             unit="text", ncols=100,leave=False,position=0)], dtype=float)
+                            for text in tqdm(texts, desc="Calculating Perplexity", unit="text", ascii=True, leave=False)], dtype=float)
         
         return 1.0 / (1.0 + np.exp(-log_ppl))
