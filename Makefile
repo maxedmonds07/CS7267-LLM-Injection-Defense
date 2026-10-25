@@ -1,7 +1,7 @@
 ifeq ($(OS),Windows_NT)
-    export PYTHONPATH := src/data;src/eval;src/models
+    SRC_PATH := src/data;src/eval;src/models
 else
-    export PYTHONPATH := src/data:src/eval:src/models
+    SRC_PATH := src/data:src/eval:src/models
 endif
 
 SHELL := /bin/bash
@@ -122,4 +122,4 @@ DETECTOR ?= tfidf
 UV_GROUP = $(if $(filter perplexity,$(DETECTOR)),--group perplexity,)
 
 evaluate: ## Fit and evaluate the selected detector
-	uv run $(UV_GROUP) python src/models/train.py --detector $(DETECTOR)
+	PYTHONPATH="$(SRC_PATH)" uv run $(UV_GROUP) python src/models/train.py --detector $(DETECTOR)

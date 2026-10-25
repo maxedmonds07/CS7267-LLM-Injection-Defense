@@ -1,10 +1,12 @@
 """The training CLI: fit, compare with the length baseline, log to MLflow when asked."""
 
+import dataclasses
 import math
 
 import mlflow
 import numpy as np
 import pandas as pd
+import pytest
 
 import train
 from train import EXPERIMENT, TFIDF_C_GRID, compare, fit_detector, main, metric_items
@@ -16,6 +18,13 @@ def test_tfidf_picks_c_from_the_grid(dataset_path):
     assert detector.name == "tfidf"
     assert params["C"] in TFIDF_C_GRID
     assert 0.0 <= params["val_auroc"] <= 1.0
+
+
+def test_tfidf_refuses_a_single_label_val_split(dataset_path):
+    data = load_data(dataset_path)
+    data = dataclasses.replace(data, val=data.val[data.val.label == 0])
+    with pytest.raises(ValueError, match="both labels"):
+        fit_detector("tfidf", data)
 
 
 def test_perplexity_uses_frozen_model_without_fit(dataset_path):

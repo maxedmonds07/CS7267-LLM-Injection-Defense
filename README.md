@@ -175,7 +175,7 @@ The frozen DistilGPT2 language model scores each text by its perplexity. Larger 
 is considered more suspicious. It is **not trained on attack labels**. Like TF-IDF, it uses
 benign validation scores to choose the fixed 1% FPR threshold, then evaluates on the same
 test and held-out datasets. For long inputs it uses overlapping context windows, so that
-every token contributes to the score. `predict_proba` is a monotonic anomaly score, **not**
+every token contributes to the score. `predict_proba` returns log-perplexity, a monotonic anomaly score and **not**
 a calibrated probability that the text is an attack.
 
 Install the optional model dependencies and evaluate:

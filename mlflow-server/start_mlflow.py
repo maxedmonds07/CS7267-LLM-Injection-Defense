@@ -17,7 +17,7 @@ def get_database_url():
     """Fetch the current Neon URL via REST, or use static DATABASE_URL."""
     project_id = os.getenv("NEON_PROJECT_ID", "").strip()
     if not project_id:
-        return os.getenv("DATABASE_URL", "").strip()
+        return with_psycopg_driver(os.getenv("DATABASE_URL", "").strip())
 
     api_key = os.getenv("NEON_API_KEY", "").strip()
     database_name = os.getenv("NEON_DATABASE_NAME", "").strip()
@@ -64,8 +64,14 @@ def get_database_url():
     database_url = payload.get("uri", "").strip()
     if not database_url.startswith(("postgresql://", "postgres://")):
         raise RuntimeError("Neon API returned an invalid PostgreSQL connection URL.")
-    # SQLAlchemy defaults postgresql:// to psycopg2; this project installs psycopg v3.
-    return "postgresql+psycopg://" + database_url.split("://", 1)[1]
+    return with_psycopg_driver(database_url)
+
+
+def with_psycopg_driver(database_url):
+    """SQLAlchemy defaults postgresql:// to psycopg2; this project installs psycopg v3."""
+    if database_url.startswith(("postgresql://", "postgres://")):
+        return "postgresql+psycopg://" + database_url.split("://", 1)[1]
+    return database_url
 
 
 def main():
@@ -84,14 +90,14 @@ def main():
     if missing:
         raise RuntimeError("Missing environment variables: " + ", ".join(missing))
 
-    # Leave the connection string in process memory; no credentials are written to .env.
+    # Pass the connection string through the environment, not argv, so `ps` doesn't show
+    # the password; mlflow reads --backend-store-uri from this variable. Nothing goes to .env.
+    env = {**os.environ, "MLFLOW_BACKEND_STORE_URI": database_url}
     command = [
         sys.executable,
         "-m",
         "mlflow",
         "server",
-        "--backend-store-uri",
-        database_url,
         "--artifacts-destination",
         f"s3://{os.environ['MLFLOW_ARTIFACT_BUCKET']}",
         "--host",
@@ -104,7 +110,7 @@ def main():
 
     print("Starting shared MLflow server...")
     print("Open: http://127.0.0.1:5000")
-    subprocess.run(command, check=True)
+    subprocess.run(command, check=True, env=env)
 
 
 if __name__ == "__main__":

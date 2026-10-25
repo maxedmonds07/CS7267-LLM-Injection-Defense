@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 mlflow.set_tracking_uri("http://127.0.0.1:5000")
 
 # Creates the experiment if it does not already exist
-mlflow.set_experiment("MLflow_Example1")
+mlflow.set_experiment("MLflow_Example")
 
 
 # ---------------------------------------------------------

@@ -8,7 +8,7 @@ Install the optional dependencies with ``uv sync --group perplexity`` before run
 """
 
 import math
-from tqdm.auto import tqdm
+
 import numpy as np
 
 
@@ -30,9 +30,9 @@ def _windows(total_tokens: int, max_context: int, stride: int):
 class PerplexityDetector:
     """Score text using a frozen causal LM: larger perplexity means more suspicious.
 
-    ``predict_proba`` returns a *monotonic anomaly score* in (0, 1), not a calibrated
-    attack probability. This matches the harness's detector interface; the ordering of
-    examples (and hence AUROC) is identical to using raw perplexity.
+    ``predict_proba`` returns log-perplexity: a *monotonic anomaly score*, not a calibrated
+    attack probability. The harness only needs the ordering, which is the same as raw
+    perplexity, and the threshold stays readable on the log scale.
     """
 
     name = "perplexity_b0"
@@ -83,7 +83,14 @@ class PerplexityDetector:
         if tokenizer.bos_token_id is None and tokenizer.eos_token_id is None:
             raise ValueError("The language-model tokenizer needs a BOS or EOS token")
 
-        device = self.device or ("cuda" if torch.cuda.is_available() else "cpu")
+        if self.device:
+            device = self.device
+        elif torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
         self.device = device
         self._tokenizer = tokenizer
         self._model = model.to(device).eval()
@@ -126,13 +133,17 @@ class PerplexityDetector:
             raise ValueError("Language model returned a non-finite perplexity score")
         return result
 
+    def log_perplexities(self, texts) -> np.ndarray:
+        """Log-perplexity of each text, with a progress bar."""
+        from tqdm.auto import tqdm  # optional group, like torch; train.py imports this module
+
+        texts = tqdm(texts, desc="Calculating Perplexity", unit="text", ascii=True, leave=False)
+        return np.array([self.log_perplexity(str(text)) for text in texts], dtype=float)
+
     def perplexities(self, texts) -> np.ndarray:
         """Return conventional raw perplexities for inspection or reporting."""
-        return np.exp([self.log_perplexity(str(text)) for text in texts])
+        return np.exp(self.log_perplexities(texts))
 
     def predict_proba(self, texts) -> np.ndarray:
-        """Return monotonically scaled perplexity scores (not calibrated probabilities)."""
-        log_ppl = np.array([self.log_perplexity(str(text)) 
-                            for text in tqdm(texts, desc="Calculating Perplexity", unit="text", ascii=True, leave=False)], dtype=float)
-        
-        return 1.0 / (1.0 + np.exp(-log_ppl))
+        """Return log-perplexity as the anomaly score (not a calibrated probability)."""
+        return self.log_perplexities(texts)

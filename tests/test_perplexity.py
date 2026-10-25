@@ -34,12 +34,12 @@ def test_higher_perplexity_means_higher_anomaly_score(monkeypatch):
     monkeypatch.setattr(detector, "log_perplexity", lambda text: {"normal": 1.0, "odd": 4.0}[text])
     scores = detector.predict_proba(["normal", "odd"])
     assert scores.shape == (2,)
-    assert np.all((scores > 0) & (scores < 1))
     assert scores[0] < scores[1]
     assert np.allclose(detector.perplexities(["normal", "odd"]), np.exp([1.0, 4.0]))
 
 
-def test_score_is_not_a_calibrated_probability(monkeypatch):
+def test_score_is_log_perplexity_not_a_probability(monkeypatch):
     detector = PerplexityDetector()
-    monkeypatch.setattr(detector, "log_perplexity", lambda _: 2.0)
-    assert np.isclose(detector.predict_proba(["anything"])[0], 1 / (1 + np.exp(-2)))
+    # A sigmoid would squash these to ~1.0 and tie them; log-perplexity keeps them apart.
+    monkeypatch.setattr(detector, "log_perplexity", lambda text: {"a": 40.0, "b": 45.0}[text])
+    assert detector.predict_proba(["a", "b"]).tolist() == [40.0, 45.0]

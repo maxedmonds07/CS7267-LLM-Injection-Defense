@@ -46,7 +46,9 @@ def fit_detector(name, data, *, ppl_model="distilbert/distilgpt2", ppl_max_conte
         raise ValueError(f"Unknown detector: {name}")
     fitted = [TfidfDetector(C=c).fit(data.train.text, data.train.label) for c in TFIDF_C_GRID]
     val_aurocs = [auroc(model.predict_proba(data.val.text), data.val.label) for model in fitted]
-    best = int(np.argmax(val_aurocs))
+    if np.isnan(val_aurocs).all():
+        raise ValueError("val AUROC is undefined for every C: the val split needs both labels")
+    best = int(np.nanargmax(val_aurocs))
     return fitted[best], {"C": TFIDF_C_GRID[best], "val_auroc": val_aurocs[best]}
 
 
@@ -100,7 +102,7 @@ def main(argv=None):
                         help="Tokens per perplexity scoring window")
     parser.add_argument("--ppl-stride", type=int, default=256,
                         help="New tokens scored in each window")
-    parser.add_argument("--ppl-device", default=None, help="cpu or cuda (default: auto)")
+    parser.add_argument("--ppl-device", default=None, help="cpu, cuda or mps (default: auto)")
     parser.add_argument("--data", default=str(DEFAULT_PATH), help="dataset.parquet to read")
     parser.add_argument("--target-fpr", type=float, default=0.01)
     parser.add_argument("--n-boot", type=int, default=1000)
@@ -120,7 +122,7 @@ def main(argv=None):
         _, reference = evaluate(fit_detector("length", data)[0], data, args.target_fpr, args.n_boot)
         shown = compare(report, reference)
 
-    print(f"{detector.name}: threshold {threshold:.4f} at {args.target_fpr:.0%} FPR on val; {params or 'no hyperparameters'}")
+    print(f"{detector.name}: threshold {threshold:.6g} at {args.target_fpr:.0%} FPR on val; {params or 'no hyperparameters'}")
     print(shown[SHOWN].to_string(index=False, float_format=lambda v: f"{v:.3f}"))
     if args.tracking_uri:
         log_run(args.tracking_uri, detector.name, params, threshold, args, report, detector)
