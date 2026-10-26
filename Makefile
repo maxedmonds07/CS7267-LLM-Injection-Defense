@@ -1,3 +1,9 @@
+ifeq ($(OS),Windows_NT)
+    SRC_PATH := src/data;src/eval;src/models
+else
+    SRC_PATH := src/data:src/eval:src/models
+endif
+
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
@@ -13,7 +19,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: help install r2-remote r2-credentials check-remote data push-data push-large newsqa report eda-report
+.PHONY: help install r2-remote r2-credentials check-remote data push-data push-large newsqa report eda-report evaluate
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -110,3 +116,10 @@ eda-report: ## Build the Phase 3 EDA PDF from notebooks/PHASE3_VISUAL_DATA.md
 	pandoc notebooks/PHASE3_VISUAL_DATA.md --shift-heading-level-by=-1 --resource-path=notebooks \
 		--metadata-file=$(EDA_DIR)/metadata.yaml -V geometry:margin=1in --pdf-engine=tectonic -H $(EDA_DIR)/header.tex -o $(EDA_DIR)/eda.pdf
 	@echo "Wrote $(EDA_DIR)/eda.pdf"
+
+DETECTOR ?= tfidf
+# Logs to MLflow when MLFLOW_TRACKING_URI is set (start the team server first; see README).
+UV_GROUP = $(if $(filter perplexity,$(DETECTOR)),--group perplexity,)
+
+evaluate: ## Fit and evaluate the selected detector
+	PYTHONPATH="$(SRC_PATH)" uv run $(UV_GROUP) python src/models/train.py --detector $(DETECTOR)

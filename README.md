@@ -72,13 +72,13 @@ Run every Python command through `uv run` (for example `uv run python ...`), or 
 
 All sources are pinned to an exact commit in `config.yaml`, so `dvc repro` is reproducible.
 
-| Source | Surface | Role in the dataset | License |
-|---|---|---|---|
-| [PoisonedRAG](https://github.com/sleeepeer/PoisonedRAG) + BEIR passages | RAG corpus | `train_pool` | MIT |
-| [BIPIA](https://github.com/microsoft/BIPIA) | Tool output (email, web, table, code, summaries) | `train_pool` | MIT; TableQA CC BY-SA 4.0 |
-| [MCPTox](https://github.com/zhiqiangwang4/MCPTox-Benchmark) | MCP tool descriptions | `loso_holdout` | None stated (team-internal copy) |
-| [MSB](https://github.com/dongsenzhang/MSB) | Tool descriptions and tool output | `transfer_holdout` | MIT |
-| [AgentDojo](https://github.com/ethz-spylab/agentdojo) 0.1.35 | End-to-end agent harness | Not in the table | MIT |
+| Source                                                                  | Surface                                          | Role in the dataset | License                          |
+| ----------------------------------------------------------------------- | ------------------------------------------------ | ------------------- | -------------------------------- |
+| [PoisonedRAG](https://github.com/sleeepeer/PoisonedRAG) + BEIR passages | RAG corpus                                       | `train_pool`        | MIT                              |
+| [BIPIA](https://github.com/microsoft/BIPIA)                             | Tool output (email, web, table, code, summaries) | `train_pool`        | MIT; TableQA CC BY-SA 4.0        |
+| [MCPTox](https://github.com/zhiqiangwang4/MCPTox-Benchmark)             | MCP tool descriptions                            | `loso_holdout`      | None stated (team-internal copy) |
+| [MSB](https://github.com/dongsenzhang/MSB)                              | Tool descriptions and tool output                | `transfer_holdout`  | MIT                              |
+| [AgentDojo](https://github.com/ethz-spylab/agentdojo) 0.1.35            | End-to-end agent harness                         | Not in the table    | MIT                              |
 
 BIPIA's WebQA (NewsQA) and Summarization (XSum) contexts are not redistributed upstream.
 The `bipia_webqa` and `bipia_summarization` stages rebuild them and check the result against
@@ -89,25 +89,25 @@ with `make newsqa ACCEPT_TERMS=1` and lives only in the team's private R2 remote
 
 `build_dataset` writes `data/processed/dataset.parquet`, one row per untrusted text segment:
 
-| Column | Meaning |
-|---|---|
-| `text`, `label` | Detector input; `1` adversarial, `0` benign |
-| `attack_kind` | `instruction` (injected commands) or `poisoning` (false content) |
-| `attack_objective` | `task_hijack`, `data_exfiltration`, `misinformation`, `denial_of_service`, `tool_selection_manipulation` |
-| `attack_family` | The source's own attack category, verbatim |
-| `source`, `subset`, `attack_surface` | Where the text comes from: `rag_corpus`, `tool_output`, `tool_description` |
-| `group`, `split` | `train`/`val`/`test` assigned per group, so a group never spans two splits |
-| `role` | `train_pool`, `loso_holdout` or `transfer_holdout` |
+| Column                               | Meaning                                                                                                  |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `text`, `label`                      | Detector input; `1` adversarial, `0` benign                                                              |
+| `attack_kind`                        | `instruction` (injected commands) or `poisoning` (false content)                                         |
+| `attack_objective`                   | `task_hijack`, `data_exfiltration`, `misinformation`, `denial_of_service`, `tool_selection_manipulation` |
+| `attack_family`                      | The source's own attack category, verbatim                                                               |
+| `source`, `subset`, `attack_surface` | Where the text comes from: `rag_corpus`, `tool_output`, `tool_description`                               |
+| `group`, `split`                     | `train`/`val`/`test` assigned per group, so a group never spans two splits                               |
+| `role`                               | `train_pool`, `loso_holdout` or `transfer_holdout`                                                       |
 
 Current build (`data/processed/summary.json`, 11,005 rows, 47 exact duplicates dropped):
 
-| Source | Surface | Adversarial | Benign |
-|---|---|---:|---:|
-| PoisonedRAG | `rag_corpus` | 1,500 | 2,955 |
-| BIPIA | `tool_output` | 2,806 | 2,806 |
-| MCPTox | `tool_description` | 485 | 362 |
-| MSB | `tool_description` | 55 | 21 |
-| MSB | `tool_output` | 15 | 0 |
+| Source      | Surface            | Adversarial | Benign |
+| ----------- | ------------------ | ----------: | -----: |
+| PoisonedRAG | `rag_corpus`       |       1,500 |  2,955 |
+| BIPIA       | `tool_output`      |       2,806 |  2,806 |
+| MCPTox      | `tool_description` |         485 |    362 |
+| MSB         | `tool_description` |          55 |     21 |
+| MSB         | `tool_output`      |          15 |      0 |
 
 The full design, including per-source construction, the attack-objective mapping and known
 limitations, is in
@@ -141,17 +141,62 @@ fetch ──────┬──────────────> bipia_sum
             └──────────────────────────────────────┘
 ```
 
-| Command | What it does |
-|---|---|
-| `make data` | Pull everything from R2, then rebuild stale stages |
-| `uv run dvc repro` | Rebuild stages whose code, params or inputs changed |
-| `uv run dvc metrics diff` | Compare `summary.json` row counts and `profile.json` against `main` |
-| `make push-data` | Upload new DVC outputs to R2 |
+| Command                             | What it does                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| `make data`                         | Pull everything from R2, then rebuild stale stages                             |
+| `uv run dvc repro`                  | Rebuild stages whose code, params or inputs changed                            |
+| `uv run dvc metrics diff`           | Compare `summary.json` row counts and `profile.json` against `main`            |
+| `make push-data`                    | Upload new DVC outputs to R2                                                   |
 | `make push-large DVC_FILE=path.dvc` | Upload one large file in small parts (for slow uplinks), then `make push-data` |
 
 After changing a stage, commit `dvc.lock`, `data/processed/summary.json` and
 `data/processed/profile.{json,md}` with the code,
 and push the data so teammates can `make data`.
+
+## Detectors
+
+Every detector is fit on `train_pool` train, picks its hyperparameters and its decision
+threshold on `train_pool` val, and is reported on the `train_pool` test split and on every row
+of MCPTox (LOSO) and MSB (transfer), next to the length-only baseline:
+
+```bash
+make evaluate DETECTOR=tfidf # print the report
+MLFLOW_TRACKING_URI=http://127.0.0.1:5000 make evaluate DETECTOR=tfidf # and log it
+```
+
+The report has AUROC with a 95% bootstrap interval, and TPR and FPR at the threshold that gives
+1% FPR on val, for each eval set and for each source, attack surface and attack kind within it.
+FPR is blank where a slice has no benign rows (MSB `tool_output`). The shared code is
+`src/eval/harness.py`; detectors live in `src/models/`.
+
+### B0: perplexity
+
+The frozen DistilGPT2 language model scores each text by its perplexity. Larger perplexity
+is considered more suspicious. It is **not trained on attack labels**. Like TF-IDF, it uses
+benign validation scores to choose the fixed 1% FPR threshold, then evaluates on the same
+test and held-out datasets. For long inputs it uses overlapping context windows, so that
+every token contributes to the score. `predict_proba` returns log-perplexity, a monotonic anomaly score and **not**
+a calibrated probability that the text is an attack.
+
+Install the optional model dependencies and evaluate:
+
+```bash
+uv sync --group perplexity
+make evaluate DETECTOR=perplexity
+```
+
+The pretrained model weights are downloaded from Hugging Face on first use. Scoring the
+full dataset on CPU may take considerable time. The detector also accepts `--ppl-model`,
+`--ppl-device`, `--ppl-max-context`, and `--ppl-stride` options when running `train.py`.
+On native Windows PowerShell, configure the import paths and run the script directly:
+
+```powershell
+$env:PYTHONPATH = "src/data;src/eval;src/models"
+uv run --group perplexity python src/models/train.py --detector perplexity
+```
+
+This is a standard causal-LM perplexity detector, not an exact reproduction of the
+PoisonedRAG paper's `cl100k_base`-based scoring procedure.
 
 ## Experiment tracking (MLflow)
 
