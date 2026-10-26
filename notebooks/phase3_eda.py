@@ -12,12 +12,13 @@ Run from the repository root, after ``data/processed/dataset.parquet`` exists:
     uv run python notebooks/phase3_eda.py
 
 Figures land in ``notebooks/figures/``. The write-up is
-``notebooks/PHASE3_VISUAL_DATA.md``; ``make eda-report`` renders it to
+``notebooks/PHASE3_VISUAL_DATA.pdf``. ``make eda-report`` copies it to
 ``report/phase3/eda.pdf``.
 """
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,7 +37,8 @@ sys.path.insert(0, str(ROOT / "src" / "data"))
 from dataset import load  # noqa: E402
 
 FIG_DIR = ROOT / "notebooks" / "figures"
-WRITEUP = ROOT / "notebooks" / "PHASE3_VISUAL_DATA.md"
+WRITEUP = ROOT / "notebooks" / "PHASE3_VISUAL_DATA.pdf"
+_MARKDOWN = ROOT / "notebooks" / "PHASE3_VISUAL_DATA.md"
 
 BENIGN = "#4C78A8"
 ADVERSARIAL = "#E45756"
@@ -475,7 +477,28 @@ The pooled training set (`train_pool`, train split) is only BIPIA and PoisonedRA
 
 That is why a length-only model fit on the pooled training set looks useless in-distribution and then looks strong on MCPTox and MSB. The between-source effect teaches it that longer means adversarial. The held-out tool descriptions happen to match that direction, while PoisonedRAG, inside itself, runs the other way. Any detector score has to be compared with length inside each source. The numbers for that comparison are already in `DATA_CARD.md`, from `src/models/baselines.py`.
 """
-    WRITEUP.write_text(text)
+    _MARKDOWN.write_text(text)
+    try:
+        subprocess.run(
+            [
+                "pandoc",
+                "notebooks/PHASE3_VISUAL_DATA.md",
+                "--shift-heading-level-by=-1",
+                "--resource-path=notebooks",
+                "--metadata-file=report/phase3/metadata.yaml",
+                "-V",
+                "geometry:margin=1in",
+                "--pdf-engine=tectonic",
+                "-H",
+                "report/phase3/header.tex",
+                "-o",
+                "notebooks/PHASE3_VISUAL_DATA.pdf",
+            ],
+            check=True,
+            cwd=ROOT,
+        )
+    finally:
+        _MARKDOWN.unlink(missing_ok=True)
 
 
 def main() -> None:
