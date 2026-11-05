@@ -148,6 +148,8 @@ fetch ──────┬──────────────> bipia_sum
 | `uv run dvc metrics diff`           | Compare `summary.json` row counts and `profile.json` against `main`            |
 | `make push-data`                    | Upload new DVC outputs to R2                                                   |
 | `make push-large DVC_FILE=path.dvc` | Upload one large file in small parts (for slow uplinks), then `make push-data` |
+| `make r2-check`                     | Check your R2 token can list and read the remote (read-only)                   |
+| `make r2-check-write`               | Also check it can write and delete, using a temporary object                   |
 
 After changing a stage, commit `dvc.lock`, `data/processed/summary.json` and
 `data/processed/profile.{json,md}` with the code,

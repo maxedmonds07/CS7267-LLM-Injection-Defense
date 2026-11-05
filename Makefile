@@ -19,7 +19,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: help install r2-remote r2-credentials check-remote data push-data push-large newsqa report eda-report evaluate
+.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report eda-report evaluate
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -44,6 +44,13 @@ r2-credentials: ## Store R2 API token keys locally (never committed)
 	$(DVC) remote modify --local $(REMOTE) access_key_id "$$key_id" && \
 	$(DVC) remote modify --local $(REMOTE) secret_access_key "$$secret" && \
 	echo "Credentials written to .dvc/config.local"
+
+# Both test .dvc/config.local, or R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY if both are set.
+r2-check: ## Check the R2 token can list and read the remote (read-only)
+	@uv run python scripts/check_r2.py
+
+r2-check-write: ## Check the R2 token can also write and delete, using a temporary object
+	@uv run python scripts/check_r2.py --write
 
 check-remote: ## Verify the remote is reachable and compare cache with it
 	$(DVC) remote list
