@@ -72,8 +72,9 @@ at 5% FPR, length's TPR on MCPTox is 0.002.
 
 1. **TPR at a matched 5% FPR**: TPR at the threshold that gives 5% FPR *on MCPTox's own
    benign rows*. Its bootstrap 95% CI lower bound must be above B1's TPR at 5% FPR, measured
-   the same way. B1 scores 0.190 today; recompute it with the same code when the numbers
-   freeze, and use that value. This threshold is computed for **measurement only**: it ranks
+   the same way. B1 scores 0.2247 (CI 0.082–0.270) with the stream 4 code (an earlier
+   estimate said 0.190; no definition reproduces it on the current B1 model). Recompute it
+   with the same code when the numbers freeze, and use that value. This threshold is computed for **measurement only**: it ranks
    detectors at equal false-positive cost and is never used to select or deploy anything.
    5% rather than 1%, because 1% of 362 benign rows is 3 rows.
 2. **Length-binned AUROC** (defined in stream 4): the bootstrap 95% CI lower bound is
@@ -109,8 +110,8 @@ by 4.8%. It is reported with CIs and labeled as indicative.
 | 3 | Where evaluation runs | Colab writes a **score file** per run (one score per row id, for val, test, MCPTox and MSB). `make evaluate DETECTOR=deberta SCORES=...` then runs the unchanged harness locally on those scores, so MLflow logging works through each member's local server as it does today. No model download is needed to evaluate (Claude's call, after the builder check) |
 | 4 | Chunking | Windows of 256 tokens with a stride of 192 (64 tokens of overlap). A text with 256 tokens or fewer is one chunk. Window and stride may be tuned on val |
 | 5 | Text score | Maximum of the chunk logits, passed through a sigmoid. Training uses the same max (multiple-instance learning), so training and inference score text the same way |
-| 6 | Loss | Binary cross-entropy on the text-level max logit, plus `pairwise_weight` × margin ranking loss on BIPIA twin pairs (attacked max logit > clean max logit). Built 2026-11-08: margin 1.0 logit; the batch loss is mean BCE over its rows plus `pairwise_weight` × mean margin over its pairs; a twin pair is one batching unit, never split across batches or micro-batches; 2,004 BIPIA pairs in train, none in PoisonedRAG. A positive weight with no groups, or with no twin pairs, is an error, never a silent row-1 run. With weight 0, training is bit-for-bit what it was before the pairwise term existed |
-| 7 | Model selection | Highest val TPR at 1% val FPR, ties broken by val AUROC, chosen per epoch and per configuration. Train_pool val only |
+| 6 | Loss | Binary cross-entropy on the text-level max logit, plus `pairwise_weight` × margin ranking loss on BIPIA twin pairs (attacked max logit > clean max logit) |
+| 7 | Model selection | Highest val TPR at 1% val FPR. **Per epoch:** ties broken by val AUROC. **Between runs** (the row-2 sweep weight, row 3's base row, and the selected configuration): ties broken by the lowest mean val log-loss (amended 2026-11-08, see below). Train_pool val only |
 | 8 | Seeds | 3 per configuration in the run plan |
 | 9 | Precision | fp16 mixed precision if the smoke test passes, otherwise fp32. DeBERTa-v3 is known to overflow in fp16 and the T4 has no bf16 |
 | 10 | Model and score storage | Score files (small) for every reported run are DVC-tracked under `report/deberta_scores/<run_name>.parquet`. Only **one** model is DVC-tracked: seed 1 of the selected configuration, under `models/deberta/<run_name>/` (safetensors and tokenizer, about 370–740 MB), kept for AgentDojo later. The lead moves it from Drive and uploads it with `make push-large`; plain `dvc push` fails above about 50 MB on the lead's uplink (Claude's call) |
@@ -205,9 +206,21 @@ go in an appendix table, so "every run is reported" still holds (Claude's call).
 | 4 | Stretch | best of rows 1–3 + synthetic tools | as row 3 | Does seeing the surface help? |
 
 The **selected configuration** for the success criterion is the row with the highest mean
-val TPR at 1% FPR across seeds, chosen before holdouts are scored. Rows 1–3 are all
-reported whichever wins. A rough estimate on a T4 is 20–40 minutes per run: 9 reported
-runs plus 2–4 one-seed sweeps for rows 1–3, about 6–9 hours. The builder confirms this with the first full run.
+val TPR at 1% FPR across seeds, ties broken by the lowest mean val log-loss, chosen before
+holdouts are scored. Rows 1–3 are all reported whichever wins. A rough estimate on a T4 is
+20–40 minutes per run: 9 reported runs plus 2–4 one-seed sweeps for rows 1–3, about 6–9
+hours. Measured on the first full run (`row1-s7267`, T4, fp16): 17.7 minutes of training for
+3 epochs, about 6 minutes per epoch.
+
+**Amendment, 2026-11-08: log-loss tie-break between runs.** The first full run saturated
+val: val TPR at 1% FPR was 1.0 from epoch 1 onward and val AUROC 0.99997. If every row
+reaches val TPR 1.0, the TPR comparison ties and an AUROC tie-break compares differences in
+the fifth decimal, which is noise. Between runs, ties are therefore broken by the lowest mean
+val log-loss (binary cross-entropy of the scores, clipped to [1e-7, 1 − 1e-7]), which still
+varies when AUROC is saturated. Per-epoch selection keeps its AUROC tie-break so that runs
+already trained are unchanged. This was decided from val numbers only, before any B2 holdout
+number was computed: `row1-s7267` had been scored but not evaluated. The success criterion is
+unchanged.
 
 ## Known risks
 

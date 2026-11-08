@@ -3,7 +3,10 @@ Fit on train_pool train, choose hyperparameters and the threshold on train_pool 
 on the train_pool test split and on every row of MCPTox (LOSO) and MSB (transfer).
 """
 import pandas as pd
-from metrics import auroc, bootstrap_auroc_ci, length_separability, rates_at_threshold, threshold_at_fpr
+from metrics import (
+    MATCHED_FPR, auroc, bootstrap_auroc_ci, bootstrap_ci, length_binned_auroc, length_separability,
+    rates_at_threshold, threshold_at_fpr, tpr_at_fpr,
+)
 from dataclasses import dataclass
 from dataset import DEFAULT_PATH, load
 
@@ -50,11 +53,21 @@ def slices(frame):
 REPORT_COLUMNS = [
     "detector", "eval_set", "slice", "n_benign", "n_adversarial",
     "auroc", "auroc_lo", "auroc_hi", "tpr", "fpr", "length_separability",
+    "tpr_at_matched_fpr", "tpr_at_matched_fpr_lo", "tpr_at_matched_fpr_hi",
+    "length_binned_auroc", "length_binned_auroc_lo", "length_binned_auroc_hi",
 ]
+
+def _matched_tpr(scores, labels):
+    return tpr_at_fpr(scores, labels, MATCHED_FPR)
+
+def _binned_auroc(scores, texts, labels):
+    return length_binned_auroc(scores, labels, texts)
 
 def evaluate(detector, data, target_fpr=0.01, n_boot=1000):
     """(threshold, report) for a fitted detector. The threshold is set once, on val benign scores,
-    and applied unchanged to every eval set and slice."""
+    and applied unchanged to every eval set and slice. tpr_at_matched_fpr is the exception: it
+    sets its own threshold at MATCHED_FPR on each slice's benign rows, so detectors are compared
+    at one FPR. It is a measurement, never a deployed threshold."""
     val_scores = detector.predict_proba(data.val.text)
     threshold = threshold_at_fpr(val_scores[data.val.label.to_numpy() == 0], target_fpr)
     records = []
@@ -64,6 +77,9 @@ def evaluate(detector, data, target_fpr=0.01, n_boot=1000):
             low, high = bootstrap_auroc_ci(rows.score, rows.label, n_boot=n_boot)
             tpr, fpr = rates_at_threshold(rows.score, rows.label, threshold)
             both_labels = rows.label.nunique() == 2
+            tpr_lo, tpr_hi = bootstrap_ci(_matched_tpr, rows.label, rows.score, n_boot=n_boot)
+            binned_lo, binned_hi = bootstrap_ci(_binned_auroc, rows.label, rows.score, rows.text,
+                                                n_boot=n_boot)
             records.append(
                 {
                     "detector": detector.name,
@@ -79,6 +95,12 @@ def evaluate(detector, data, target_fpr=0.01, n_boot=1000):
                     "length_separability": (
                         length_separability(rows.text, rows.label) if both_labels else float("nan")
                     ),
+                    "tpr_at_matched_fpr": _matched_tpr(rows.score, rows.label),
+                    "tpr_at_matched_fpr_lo": tpr_lo,
+                    "tpr_at_matched_fpr_hi": tpr_hi,
+                    "length_binned_auroc": _binned_auroc(rows.score, rows.text, rows.label),
+                    "length_binned_auroc_lo": binned_lo,
+                    "length_binned_auroc_hi": binned_hi,
                 }
             )
     return threshold, pd.DataFrame(records, columns=REPORT_COLUMNS)

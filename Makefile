@@ -19,7 +19,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report eda-report evaluate
+.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report eda-report evaluate b2-report
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -128,4 +128,7 @@ DETECTOR ?= tfidf
 UV_GROUP = $(if $(filter perplexity,$(DETECTOR)),--group perplexity,)
 
 evaluate: ## Fit and evaluate the selected detector
-	PYTHONPATH="$(SRC_PATH)" uv run $(UV_GROUP) python src/models/train.py --detector $(DETECTOR) $(if $(SCORES),--scores $(SCORES),)
+	PYTHONPATH="$(SRC_PATH)" uv run $(UV_GROUP) python src/models/train.py --detector $(DETECTOR) $(if $(SCORES),--scores $(SCORES),) $(if $(OUT),--out $(OUT),)
+
+b2-report: ## Choose B2's configuration on val and write b2_verdict.md and b2_deberta_<row>.csv
+	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/verdict.py --scores-dir report/deberta_scores --b1 report/baselines/b1_tfidf_lr.csv --out-dir report/baselines
