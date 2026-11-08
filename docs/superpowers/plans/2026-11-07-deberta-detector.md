@@ -740,6 +740,8 @@ Note for the write-up: these rows use AgentDojo's tool descriptions. If B2 is la
 
 Branch `phase3/deberta-results` (lead). Needs Tasks 2 and 7 merged.
 
+Done 2026-11-08, stacked on `phase3/eval-metrics` (PR #31) while that PR was open; retarget to `main` once #31 merges. Strict `>` on both bars, and a NaN lower bound fails the seed. The CLI refuses a scores directory with no reported runs, and a B1 CSV without `tpr_at_matched_fpr`.
+
 **Files:**
 - Create: `src/eval/verdict.py`, `tests/test_verdict.py`
 - Modify: `Makefile` (target `b2-report`)
@@ -757,7 +759,7 @@ Branch `phase3/deberta-results` (lead). Needs Tasks 2 and 7 merged.
   - CLI `python src/eval/verdict.py --scores-dir report/deberta_scores --b1 report/baselines/b1_tfidf_lr.csv --out-dir report/baselines`. It writes `b2_deberta_<row>.csv` per row (the report columns plus `seed`) and `b2_verdict.md`: the selected row, B1's bar, and every seed's two lower bounds with pass or fail.
   - `make b2-report` runs it.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_verdict_values():
@@ -782,21 +784,21 @@ def test_cli_writes_seed_column_and_verdict(dataset_path, tmp_path): ...
 
 The selection test builds two score files where val and MCPTox scores disagree. The CLI test writes three seed files for one row and checks that `seed` is in the CSV and the verdict file names the row and B1's bar.
 
-- [ ] **Step 2: Run and see them fail**
+- [x] **Step 2: Run and see them fail**
 
 Run: `uv run pytest tests/test_verdict.py -v`
 Expected: FAIL with `ModuleNotFoundError`.
 
-- [ ] **Step 3: Implement `src/eval/verdict.py` and the `b2-report` target**
+- [x] **Step 3: Implement `src/eval/verdict.py` and the `b2-report` target**
 
 Sweep files are excluded from selection and from the CSVs: their `val_only` metadata is true. They go into an appendix table in `b2_verdict.md`, val numbers only.
 
-- [ ] **Step 4: Run and see them pass**
+- [x] **Step 4: Run and see them pass**
 
 Run: `uv run pytest -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/eval/verdict.py tests/test_verdict.py Makefile
