@@ -78,3 +78,19 @@ def test_logs_a_run(dataset_path, tmp_path, monkeypatch):
     assert len(runs) == 1
     assert runs.loc[0, "params.detector"] == "tfidf"
     assert runs.loc[0, "metrics.auroc/mcptox/all"] == 1.0
+
+
+def test_metric_keys_include_the_new_metrics():
+    report = pd.DataFrame([{"eval_set": "mcptox", "slice": "all", "auroc": 0.7, "tpr": 0.2, "fpr": 0.01,
+                            "tpr_at_matched_fpr": 0.3, "length_binned_auroc": 0.6}])
+    items = metric_items(report)
+    assert items["tpr_at_matched_fpr/mcptox/all"] == 0.3
+    assert items["length_binned_auroc/mcptox/all"] == 0.6
+
+
+def test_out_writes_the_report_csv(dataset_path, tmp_path, monkeypatch):
+    from harness import REPORT_COLUMNS
+    monkeypatch.delenv("MLFLOW_TRACKING_URI", raising=False)
+    out = tmp_path / "b1.csv"
+    main(["--detector", "tfidf", "--data", str(dataset_path), "--n-boot", "20", "--out", str(out)])
+    assert list(pd.read_csv(out).columns) == REPORT_COLUMNS

@@ -72,8 +72,9 @@ at 5% FPR, length's TPR on MCPTox is 0.002.
 
 1. **TPR at a matched 5% FPR**: TPR at the threshold that gives 5% FPR *on MCPTox's own
    benign rows*. Its bootstrap 95% CI lower bound must be above B1's TPR at 5% FPR, measured
-   the same way. B1 scores 0.190 today; recompute it with the same code when the numbers
-   freeze, and use that value. This threshold is computed for **measurement only**: it ranks
+   the same way. B1 scores 0.2247 (CI 0.082–0.270) with the stream 4 code (an earlier
+   estimate said 0.190; no definition reproduces it on the current B1 model). Recompute it
+   with the same code when the numbers freeze, and use that value. This threshold is computed for **measurement only**: it ranks
    detectors at equal false-positive cost and is never used to select or deploy anything.
    5% rather than 1%, because 1% of 362 benign rows is 3 rows.
 2. **Length-binned AUROC** (defined in stream 4): the bootstrap 95% CI lower bound is

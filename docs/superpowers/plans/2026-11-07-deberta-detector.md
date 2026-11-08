@@ -67,7 +67,7 @@ Branch `phase3/eval-metrics` (stream 4).
   - `length_binned_auroc(scores, labels, texts, n_bins=4, min_rows=40) -> float`
   - `MATCHED_FPR = 0.05`
 
-- [ ] **Step 1: Write the failing tests** (append to `tests/test_metrics.py`)
+- [x] **Step 1: Write the failing tests** (append to `tests/test_metrics.py`)
 
 ```python
 def test_tpr_at_fpr_sets_its_threshold_on_these_rows():
@@ -110,12 +110,12 @@ def test_bootstrap_auroc_ci_unchanged_after_refactor():
         bootstrap_ci(auroc, labels, scores, n_boot=200))
 ```
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `uv run pytest tests/test_metrics.py -v`
 Expected: FAIL with `ImportError` for `tpr_at_fpr`, `length_binned_auroc`, `bootstrap_ci`.
 
-- [ ] **Step 3: Implement the four functions and `MATCHED_FPR` in `src/eval/metrics.py`**
+- [x] **Step 3: Implement the four functions and `MATCHED_FPR` in `src/eval/metrics.py`**
 
 `length_binned_auroc` algorithm, which the tests do not fully pin:
 - NaN if `len(texts) < min_rows` or either label is absent.
@@ -123,12 +123,12 @@ Expected: FAIL with `ImportError` for `tpr_at_fpr`, `length_binned_auroc`, `boot
 - Compute `auroc` in every bin that holds both labels.
 - NaN if fewer than two bins qualify. Otherwise return the mean weighted by each qualifying bin's row count.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run pytest tests/test_metrics.py -v`
 Expected: all PASS, including the existing metric tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/eval/metrics.py tests/test_metrics.py
@@ -154,7 +154,7 @@ Branch `phase3/eval-metrics` (stream 4).
   - `train.main` accepts `--out PATH` and writes the detector's report CSV there.
   - `make evaluate ... OUT=path.csv`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # tests/test_harness.py
@@ -179,24 +179,24 @@ def test_out_writes_the_report_csv(dataset_path, tmp_path, monkeypatch):
     assert list(pd.read_csv(out).columns) == REPORT_COLUMNS   # import REPORT_COLUMNS from harness
 ```
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `uv run pytest tests/test_harness.py tests/test_train.py -v`
 Expected: FAIL. `tpr_at_matched_fpr` is not a column, and `--out` is an unrecognized argument.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 - In `evaluate`, compute the six values per slice with `tpr_at_fpr(..., MATCHED_FPR)`, `length_binned_auroc(..., rows.text)` and `bootstrap_ci` (pass `rows.text` lengths as an extra column for the length-binned interval).
 - Add `tpr_at_matched_fpr` and `length_binned_auroc` to `SHOWN` and to the metrics `metric_items` loops over.
 - Add `--out` to `train.main`.
 - In the Makefile `evaluate` recipe, append `$(if $(OUT),--out $(OUT),)`.
 
-- [ ] **Step 4: Run the whole suite**
+- [x] **Step 4: Run the whole suite**
 
 Run: `uv run pytest -v`
 Expected: all PASS.
 
-- [ ] **Step 5: Regenerate the baselines and sanity-check length (spec stream 4 "done when")**
+- [x] **Step 5: Regenerate the baselines and sanity-check length (spec stream 4 "done when")**
 
 ```bash
 make evaluate DETECTOR=tfidf OUT=report/baselines/b1_tfidf_lr.csv
@@ -206,10 +206,11 @@ make evaluate DETECTOR=length OUT=/tmp/length.csv
 
 Expected:
 - In `b1_tfidf_lr.csv`, the `mcptox`/`all` row has `tpr_at_matched_fpr` ≈ 0.190, and AUROC is unchanged at 0.675.
+  - Result (2026-11-08): 0.2247, not 0.190. Every definition (strict `>`, `>=`, `roc_curve` step or interpolated) gives 0.2247 on this model, and length gives the spec's 0.002, so the code matches the spec and 0.190 was an earlier figure. The spec now records 0.2247.
 - In the length output, `mcptox`/`all` has `length_binned_auroc` within 0.5 ± 0.1. If not, stop and report: the metric is not removing length.
 - Write B1's exact `tpr_at_matched_fpr` value into the PR description. It is the bar for the verdict.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/eval/harness.py src/models/train.py Makefile tests/ report/baselines/
