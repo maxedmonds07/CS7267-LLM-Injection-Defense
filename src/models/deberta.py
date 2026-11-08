@@ -234,8 +234,10 @@ class DebertaDetector:
             self.tokenizer = self._init_tokenizer()
         torch.manual_seed(self.seed)
         self.model = self._init_model().to(self._torch_device())
+        texts = list(texts)
         token_lists = self._encode(texts)
         units = self._units(len(token_lists), groups, labels)
+        self._fingerprint = self._data_fingerprint(texts, labels, groups, val)
 
         steps_per_epoch = math.ceil(len(units) / max(1, self._units_per_batch(units)))
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
@@ -276,6 +278,21 @@ class DebertaDetector:
 
     # --- checkpoints ------------------------------------------------------------------
 
+    @staticmethod
+    def _data_fingerprint(texts, labels, groups, val) -> str:
+        """sha256 of exactly what a run trains and selects on, so a checkpoint from another run
+        (a --limit smoke run, another row's train sources, a run without val) is never resumed."""
+        import hashlib
+        import json
+
+        payload = {
+            "texts": list(texts),
+            "labels": [int(label) for label in labels],
+            "groups": None if groups is None else [str(g) for g in groups],
+            "val": None if val is None else [list(val[0]), [int(label) for label in val[1]]],
+        }
+        return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
+
     def _epoch_dirs(self):
         """{epoch: directory} for every completed checkpoint (temp directories excluded)."""
         from pathlib import Path
@@ -302,6 +319,7 @@ class DebertaDetector:
         torch.save(self.model.state_dict(), tmp / "model.pt")
         torch.save({
             "config": self.config(),
+            "data": self._fingerprint,
             "history": self.history,
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),
@@ -316,6 +334,9 @@ class DebertaDetector:
         for old, directory in self._epoch_dirs().items():
             if old not in keep:
                 shutil.rmtree(directory)
+            elif old != epoch:
+                # Only the latest epoch needs optimizer state to resume; the best keeps weights.
+                (directory / "state.pt").unlink(missing_ok=True)
 
     def _load_checkpoint(self, optimizer, scheduler, scaler):
         """Restore the latest completed epoch. Returns (next epoch, best weights or None)."""
@@ -330,6 +351,10 @@ class DebertaDetector:
             raise ValueError(
                 f"{self.checkpoint_dir} holds a run with a different configuration: "
                 f"{state['config']} (this run: {self.config()}); use a fresh checkpoint_dir")
+        if state.get("data") != self._fingerprint:
+            raise ValueError(
+                f"{self.checkpoint_dir} holds a run with different training data (rows, labels, "
+                f"groups or val set; for example a --limit smoke run); use a fresh checkpoint_dir")
         device = self._torch_device()
         self.model.load_state_dict(torch.load(dirs[latest] / "model.pt", map_location=device, weights_only=True))
         optimizer.load_state_dict(state["optimizer"])
@@ -370,7 +395,10 @@ class DebertaDetector:
         with torch.no_grad():
             for group in self._micro_batches([[i] for i in range(len(token_lists))], token_lists):
                 rows = [i for unit in group for i in unit]
-                scores.append(torch.sigmoid(self._doc_logits([token_lists[i] for i in rows])).cpu())
+                # Sigmoid in float64: in float32 every logit above ~16.6 becomes exactly 1.0,
+                # and the ties would cost AUROC and matched-FPR TPR their ordering.
+                logits = self._doc_logits([token_lists[i] for i in rows]).detach().cpu().double()
+                scores.append(torch.sigmoid(logits))
         return torch.cat(scores).numpy().astype(np.float64) if scores else np.zeros(0)
 
     def config(self) -> dict:

@@ -162,3 +162,48 @@ def test_checkpoint_from_another_config_is_refused(tiny, tmp_path):
     with pytest.raises(ValueError, match="different configuration"):
         DebertaDetector(epochs=1, batch_size=4, lr=1e-3, fp16=False, device="cpu",
                         checkpoint_dir=tmp_path).fit(TEXTS, LABELS)
+
+
+def test_checkpoint_from_different_training_data_is_refused(tiny, tmp_path):
+    # A smoke run (fewer rows) must never be resumed as the real run in the same directory.
+    from deberta import DebertaDetector
+
+    kwargs = dict(epochs=1, batch_size=4, fp16=False, device="cpu", checkpoint_dir=tmp_path)
+    DebertaDetector(**kwargs).fit(TEXTS[4:12], LABELS[4:12])
+    with pytest.raises(ValueError, match="different training data"):
+        DebertaDetector(**kwargs).fit(TEXTS, LABELS)
+
+
+def test_checkpoint_without_val_is_refused_for_a_run_with_val(tiny, tmp_path):
+    from deberta import DebertaDetector
+
+    kwargs = dict(epochs=1, batch_size=4, fp16=False, device="cpu", checkpoint_dir=tmp_path)
+    DebertaDetector(**kwargs).fit(TEXTS, LABELS)
+    with pytest.raises(ValueError, match="different training data"):
+        DebertaDetector(**kwargs).fit(TEXTS, LABELS, val=(TEXTS, LABELS))
+
+
+def test_best_checkpoint_keeps_weights_only(tiny, tmp_path, monkeypatch):
+    # Optimizer state doubles a checkpoint; only the latest epoch needs it to resume.
+    from deberta import DebertaDetector
+
+    detector = DebertaDetector(epochs=2, batch_size=4, fp16=False, device="cpu", checkpoint_dir=tmp_path)
+    monkeypatch.setattr(detector, "_val_metrics",
+                        lambda val: {"val_tpr": 1.0 - 0.5 * len(detector.history), "val_auroc": 0.5})
+    detector.fit(TEXTS, LABELS, val=(TEXTS, LABELS))
+    assert detector.selected_epoch == 0
+    assert (tmp_path / "epoch_0" / "model.pt").exists()
+    assert not (tmp_path / "epoch_0" / "state.pt").exists()
+    assert (tmp_path / "epoch_1" / "state.pt").exists()
+
+
+def test_confident_scores_keep_their_order(tiny, monkeypatch):
+    # fp32 sigmoid rounds every logit above ~16.6 to exactly 1.0, tying AUROC pairs.
+    import torch
+
+    tiny.fit(TEXTS[:4], LABELS[:4])
+    logits = iter([torch.tensor([20.0]), torch.tensor([25.0])])
+    monkeypatch.setattr(tiny, "_chunk_logits", lambda windows: next(logits))
+    tiny.max_chunks = 1  # one text per forward pass, so each call gets one logit
+    low, high = tiny.predict_proba(["first text", "second text"])
+    assert low < high < 1.0
