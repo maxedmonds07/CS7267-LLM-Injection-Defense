@@ -244,7 +244,13 @@ class DebertaDetector:
         scaler = torch.amp.GradScaler("cuda") if self._use_amp() else None
 
         self.history, best_state = [], None
-        for epoch in range(self.epochs):
+        start = 0
+        if self.checkpoint_dir:
+            start, best_state = self._load_checkpoint(optimizer, scheduler, scaler)
+        self.resumed_from_epoch = start
+        for epoch in range(start, self.epochs):
+            # Each epoch's shuffle and dropout depend only on seed + epoch, so a resumed run
+            # replays exactly the batches an uninterrupted run would have seen.
             torch.manual_seed(self.seed + epoch)
             order = np.random.default_rng(self.seed + epoch).permutation(len(units))
             self.model.train()
@@ -258,6 +264,8 @@ class DebertaDetector:
             self.history.append(entry)
             if val is not None and select_epoch(self.history) == epoch:
                 best_state = copy.deepcopy({k: v.cpu() for k, v in self.model.state_dict().items()})
+            if self.checkpoint_dir:
+                self._save_checkpoint(epoch, optimizer, scheduler, scaler)
 
         if val is not None:
             self.selected_epoch = select_epoch(self.history)
@@ -265,6 +273,75 @@ class DebertaDetector:
         else:
             self.selected_epoch = self.epochs - 1
         return self
+
+    # --- checkpoints ------------------------------------------------------------------
+
+    def _epoch_dirs(self):
+        """{epoch: directory} for every completed checkpoint (temp directories excluded)."""
+        from pathlib import Path
+
+        root = Path(self.checkpoint_dir)
+        if not root.exists():
+            return {}
+        return {int(d.name.split("_")[1]): d for d in root.iterdir()
+                if d.is_dir() and d.name.startswith("epoch_") and not d.name.endswith(".tmp")}
+
+    def _save_checkpoint(self, epoch, optimizer, scheduler, scaler):
+        """Write epoch_{epoch}/ atomically (temp dir, then rename), so a disconnect mid-save never
+        leaves a checkpoint that looks complete. Keeps only the latest and the best epoch."""
+        import shutil
+        from pathlib import Path
+
+        import torch
+
+        root = Path(self.checkpoint_dir)
+        root.mkdir(parents=True, exist_ok=True)
+        tmp, final = root / f"epoch_{epoch}.tmp", root / f"epoch_{epoch}"
+        shutil.rmtree(tmp, ignore_errors=True)
+        tmp.mkdir()
+        torch.save(self.model.state_dict(), tmp / "model.pt")
+        torch.save({
+            "config": self.config(),
+            "history": self.history,
+            "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(),
+            "scaler": scaler.state_dict() if scaler else None,
+        }, tmp / "state.pt")
+        shutil.rmtree(final, ignore_errors=True)
+        tmp.rename(final)
+
+        keep = {epoch}
+        if self.history and "val_tpr" in self.history[0]:
+            keep.add(self.history[select_epoch(self.history)]["epoch"])
+        for old, directory in self._epoch_dirs().items():
+            if old not in keep:
+                shutil.rmtree(directory)
+
+    def _load_checkpoint(self, optimizer, scheduler, scaler):
+        """Restore the latest completed epoch. Returns (next epoch, best weights or None)."""
+        import torch
+
+        dirs = self._epoch_dirs()
+        if not dirs:
+            return 0, None
+        latest = max(dirs)
+        state = torch.load(dirs[latest] / "state.pt", map_location="cpu", weights_only=True)
+        if state["config"] != self.config():
+            raise ValueError(
+                f"{self.checkpoint_dir} holds a run with a different configuration: "
+                f"{state['config']} (this run: {self.config()}); use a fresh checkpoint_dir")
+        device = self._torch_device()
+        self.model.load_state_dict(torch.load(dirs[latest] / "model.pt", map_location=device, weights_only=True))
+        optimizer.load_state_dict(state["optimizer"])
+        scheduler.load_state_dict(state["scheduler"])
+        if scaler and state["scaler"]:
+            scaler.load_state_dict(state["scaler"])
+        self.history = state["history"]
+        best_state = None
+        if self.history and "val_tpr" in self.history[0]:
+            best = self.history[select_epoch(self.history)]["epoch"]
+            best_state = torch.load(dirs[best] / "model.pt", map_location="cpu", weights_only=True)
+        return latest + 1, best_state
 
     def _units_per_batch(self, units):
         rows_per_unit = sum(len(u) for u in units) / max(1, len(units))

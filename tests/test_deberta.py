@@ -126,3 +126,64 @@ def test_nan_loss_raises_with_fp32_hint(tiny, monkeypatch):
     monkeypatch.setattr(tiny, "_loss", lambda units, doc_logits, labels: torch.tensor(float("nan")))
     with pytest.raises(FloatingPointError, match="fp16=False"):
         tiny.fit(TEXTS, LABELS)
+
+
+def test_resume_matches_uninterrupted_run(tiny, tmp_path):
+    from deberta import DebertaDetector
+
+    common = dict(epochs=2, batch_size=4, fp16=False, device="cpu")
+    straight = DebertaDetector(**common).fit(TEXTS, LABELS)
+
+    # "Disconnect" right after epoch 1's checkpoint is written, then rerun the same job.
+    interrupted = DebertaDetector(checkpoint_dir=tmp_path, **common)
+    save = interrupted._save_checkpoint
+
+    def save_then_disconnect(*args, **kwargs):
+        save(*args, **kwargs)
+        raise KeyboardInterrupt
+
+    interrupted._save_checkpoint = save_then_disconnect
+    with pytest.raises(KeyboardInterrupt):
+        interrupted.fit(TEXTS, LABELS)
+    resumed = DebertaDetector(checkpoint_dir=tmp_path, **common).fit(TEXTS, LABELS)
+    assert resumed.resumed_from_epoch == 1
+    assert np.allclose(resumed.predict_proba(TEXTS), straight.predict_proba(TEXTS), atol=1e-6)
+
+
+def test_finished_run_does_not_retrain(tiny, tmp_path):
+    from deberta import DebertaDetector
+
+    kwargs = dict(epochs=1, batch_size=4, fp16=False, device="cpu", checkpoint_dir=tmp_path)
+    first = DebertaDetector(**kwargs).fit(TEXTS, LABELS)
+    again = DebertaDetector(**kwargs).fit(TEXTS, LABELS)
+    assert again.resumed_from_epoch == 1 and len(again.history) == 1
+    assert np.allclose(again.predict_proba(TEXTS), first.predict_proba(TEXTS))
+
+
+def test_resume_keeps_val_selection(tiny, tmp_path):
+    from deberta import DebertaDetector
+
+    kwargs = dict(batch_size=4, fp16=False, device="cpu", checkpoint_dir=tmp_path)
+    interrupted = DebertaDetector(epochs=2, **kwargs)
+    save = interrupted._save_checkpoint
+
+    def save_then_disconnect(*args, **kw):
+        save(*args, **kw)
+        raise KeyboardInterrupt
+
+    interrupted._save_checkpoint = save_then_disconnect
+    with pytest.raises(KeyboardInterrupt):
+        interrupted.fit(TEXTS, LABELS, val=(TEXTS, LABELS))
+    resumed = DebertaDetector(epochs=2, **kwargs).fit(TEXTS, LABELS, val=(TEXTS, LABELS))
+    assert resumed.resumed_from_epoch == 1
+    assert len(resumed.history) == 2
+    assert resumed.selected_epoch == select_epoch(resumed.history)
+
+
+def test_checkpoint_from_another_config_is_refused(tiny, tmp_path):
+    from deberta import DebertaDetector
+
+    DebertaDetector(epochs=1, batch_size=4, fp16=False, device="cpu", checkpoint_dir=tmp_path).fit(TEXTS, LABELS)
+    with pytest.raises(ValueError, match="different configuration"):
+        DebertaDetector(epochs=1, batch_size=4, lr=1e-3, fp16=False, device="cpu",
+                        checkpoint_dir=tmp_path).fit(TEXTS, LABELS)
