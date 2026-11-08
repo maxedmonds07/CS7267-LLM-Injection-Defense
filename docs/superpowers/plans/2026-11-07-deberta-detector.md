@@ -67,7 +67,7 @@ Branch `phase3/eval-metrics` (stream 4).
   - `length_binned_auroc(scores, labels, texts, n_bins=4, min_rows=40) -> float`
   - `MATCHED_FPR = 0.05`
 
-- [ ] **Step 1: Write the failing tests** (append to `tests/test_metrics.py`)
+- [x] **Step 1: Write the failing tests** (append to `tests/test_metrics.py`)
 
 ```python
 def test_tpr_at_fpr_sets_its_threshold_on_these_rows():
@@ -110,12 +110,12 @@ def test_bootstrap_auroc_ci_unchanged_after_refactor():
         bootstrap_ci(auroc, labels, scores, n_boot=200))
 ```
 
-- [ ] **Step 2: Run them and see them fail**
+- [x] **Step 2: Run them and see them fail**
 
 Run: `uv run pytest tests/test_metrics.py -v`
 Expected: FAIL with `ImportError` for `tpr_at_fpr`, `length_binned_auroc`, `bootstrap_ci`.
 
-- [ ] **Step 3: Implement the four functions and `MATCHED_FPR` in `src/eval/metrics.py`**
+- [x] **Step 3: Implement the four functions and `MATCHED_FPR` in `src/eval/metrics.py`**
 
 `length_binned_auroc` algorithm, which the tests do not fully pin:
 - NaN if `len(texts) < min_rows` or either label is absent.
@@ -123,12 +123,12 @@ Expected: FAIL with `ImportError` for `tpr_at_fpr`, `length_binned_auroc`, `boot
 - Compute `auroc` in every bin that holds both labels.
 - NaN if fewer than two bins qualify. Otherwise return the mean weighted by each qualifying bin's row count.
 
-- [ ] **Step 4: Run the tests and see them pass**
+- [x] **Step 4: Run the tests and see them pass**
 
 Run: `uv run pytest tests/test_metrics.py -v`
 Expected: all PASS, including the existing metric tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/eval/metrics.py tests/test_metrics.py

@@ -3,7 +3,10 @@
 import pytest
 import math
 import numpy as np
-from metrics import length_separability, auroc, bootstrap_auroc_ci, rates_at_threshold, threshold_at_fpr
+from metrics import (
+    MATCHED_FPR, auroc, bootstrap_auroc_ci, bootstrap_ci, length_binned_auroc, length_separability,
+    rates_at_threshold, threshold_at_fpr, tpr_at_fpr,
+)
 
 def test_longer_adversarial_is_fully_separable():
     assert length_separability(["a", "bb", "cccc", "ddddd"], [0, 0, 1, 1]) == 1.0
@@ -78,3 +81,65 @@ def test_bootstrap_interval_brackets_the_estimate():
 def test_bootstrap_with_one_label():
     lo, hi = bootstrap_auroc_ci([0.9, 0.1], [1, 1], n_boot=10)
     assert math.isnan(lo) and math.isnan(hi)
+
+
+def test_matched_fpr_is_five_percent():
+    assert MATCHED_FPR == 0.05
+
+
+def test_tpr_at_fpr_sets_its_threshold_on_these_rows():
+    benign = np.linspace(0, 1, 100)          # 5 of 100 lie above 0.95
+    adversarial = np.array([0.97, 0.99, 0.5, 0.2])
+    scores = np.r_[benign, adversarial]
+    labels = np.r_[np.zeros(100), np.ones(4)]
+    assert tpr_at_fpr(scores, labels, fpr=0.05) == 0.5
+
+
+def test_tpr_at_fpr_is_nan_with_one_label():
+    assert math.isnan(tpr_at_fpr([0.1, 0.9], [1, 1]))
+
+
+def test_length_binned_auroc_ignores_a_pure_length_score():
+    # Long texts are mostly adversarial; the score only says "long".
+    texts = ["x" * n for n in range(1, 201)]
+    labels = np.array([int(n > 100 and n % 4 != 0) for n in range(1, 201)])
+    scores = np.array([float(len(t) > 100) for t in texts])
+    assert auroc(scores, labels) > 0.7
+    assert length_binned_auroc(scores, labels, texts) == 0.5
+
+
+def test_length_binned_auroc_rewards_a_real_signal():
+    texts = ["x" * n for n in range(1, 201)]
+    labels = np.array([n % 2 for n in range(1, 201)])
+    assert length_binned_auroc(labels.astype(float), labels, texts) == 1.0
+
+
+def test_length_binned_auroc_nan_below_min_rows():
+    assert math.isnan(length_binned_auroc([0.1, 0.9] * 10, [0, 1] * 10, ["a", "bb"] * 10))
+
+
+def test_length_binned_auroc_equal_bins_when_lengths_tie():
+    # Every text has the same length: ranking first still makes four equal bins.
+    texts = ["same"] * 80
+    labels = np.array([i % 2 for i in range(80)])
+    assert length_binned_auroc(labels.astype(float), labels, texts) == 1.0
+
+
+def test_bootstrap_ci_recomputes_the_statistic_per_replicate():
+    scores = np.r_[np.linspace(0, 1, 200), np.linspace(0.5, 1.5, 200)]
+    labels = np.r_[np.zeros(200), np.ones(200)]
+    low, high = bootstrap_ci(lambda s, y: tpr_at_fpr(s, y, 0.05), labels, scores, n_boot=200)
+    point = tpr_at_fpr(scores, labels, 0.05)
+    assert low < point < high
+
+
+def test_bootstrap_ci_nan_with_one_label():
+    low, high = bootstrap_ci(auroc, [1, 1, 1], [0.1, 0.2, 0.3], n_boot=20)
+    assert math.isnan(low) and math.isnan(high)
+
+
+def test_bootstrap_auroc_ci_unchanged_after_refactor():
+    scores = np.r_[np.linspace(0, 1, 50), np.linspace(0.3, 1.3, 50)]
+    labels = np.r_[np.zeros(50), np.ones(50)]
+    assert bootstrap_auroc_ci(scores, labels, n_boot=200) == pytest.approx(
+        bootstrap_ci(auroc, labels, scores, n_boot=200))
