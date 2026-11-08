@@ -466,6 +466,8 @@ git commit -m "Checkpoint DebertaDetector every epoch and resume after a disconn
 
 Branch `phase3/deberta-pairwise` from `phase3/deberta-core` (stream 3).
 
+Done 2026-11-08, branched from `main` (deberta-core had merged). Also: the scheduler counts its exact steps from each epoch's seeded order (PR #30 follow-up); `fit` refuses a positive weight with no twin pairs; `run.json` records `pairwise_weight` and `twin_pairs`. Weight 0 was checked bit-for-bit against `main`. Tests that need the tokenizer skip when the Hugging Face hub is unreachable; run with `HF_HUB_OFFLINE=1` to use the cache.
+
 **Files:**
 - Modify: `src/models/deberta.py`, `tests/test_deberta.py`
 
@@ -475,7 +477,7 @@ Branch `phase3/deberta-pairwise` from `phase3/deberta-core` (stream 3).
   - `pairwise_margin_loss(attacked_logits, clean_logits, margin=1.0) -> torch.Tensor`: mean of `relu(margin - (attacked - clean))`, and `0.0` for empty input.
   - When `pairwise_weight > 0`, `fit` requires `groups` and builds batches from units: a twin pair is one unit (both rows always in the same batch), and every other row is a unit of one. Loss = BCE + `pairwise_weight` × `pairwise_margin_loss` over the pairs in the batch.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 def test_margin_loss_zero_when_twins_are_separated():
@@ -503,19 +505,19 @@ def test_twins_share_a_batch(tiny, monkeypatch):
 
 In `test_twins_share_a_batch`, fill in the `...`: wrap whichever per-batch method Task 4 introduced, so each batch's indices are recorded.
 
-- [ ] **Step 2: Run and see them fail**
+- [x] **Step 2: Run and see them fail**
 
 Run: `uv run --group deberta pytest tests/test_deberta.py -k "margin or pairwise or twins" -v`
 Expected: FAIL with `ImportError: pairwise_margin_loss`.
 
-- [ ] **Step 3: Implement** `pairwise_margin_loss`, unit batching and the combined loss in `fit`. A batch holds up to `batch_size` rows. A pair never splits across batches.
+- [x] **Step 3: Implement** `pairwise_margin_loss`, unit batching and the combined loss in `fit`. A batch holds up to `batch_size` rows. A pair never splits across batches.
 
-- [ ] **Step 4: Run the whole deberta test file**
+- [x] **Step 4: Run the whole deberta test file**
 
 Run: `uv run --group deberta pytest tests/test_deberta.py -v`
 Expected: PASS, with the Task 5 resume tests still green.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/models/deberta.py tests/test_deberta.py

@@ -97,10 +97,13 @@ def train(args) -> None:
         "seed": args.seed,
         "train_sources": list(args.train_sources),
         "limit": args.limit,
+        "pairwise_weight": args.pairwise_weight,
+        "twin_pairs": detector.n_twin_pairs,
         "git_commit": git_commit(),
     }
     (Path(args.model_out) / "run.json").write_text(json.dumps(run, indent=2))
-    print(f"trained {run['run_name']}: selected epoch {detector.selected_epoch}, "
+    print(f"trained {run['run_name']}: pairwise weight {args.pairwise_weight} on "
+          f"{detector.n_twin_pairs} twin pairs; selected epoch {detector.selected_epoch}, "
           f"history {detector.history}")
 
 

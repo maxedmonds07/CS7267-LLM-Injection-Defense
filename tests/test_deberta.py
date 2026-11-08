@@ -98,7 +98,7 @@ def test_val_history_and_selection(tiny):
 def test_nan_loss_raises_with_fp32_hint(tiny, monkeypatch):
     import torch
 
-    monkeypatch.setattr(tiny, "_loss", lambda units, doc_logits, labels: torch.tensor(float("nan")))
+    monkeypatch.setattr(tiny, "_loss", lambda units, doc_logits, labels, **kw: torch.tensor(float("nan")))
     with pytest.raises(FloatingPointError, match="fp16=False"):
         tiny.fit(TEXTS, LABELS)
 
@@ -207,3 +207,86 @@ def test_confident_scores_keep_their_order(tiny, monkeypatch):
     tiny.max_chunks = 1  # one text per forward pass, so each call gets one logit
     low, high = tiny.predict_proba(["first text", "second text"])
     assert low < high < 1.0
+
+
+# --- pairwise margin loss on BIPIA twins (Task 6) -------------------------------------------
+
+TWIN_GROUPS = [f"g{i % 8}" for i in range(16)]       # row i (attacked) and i + 8 (clean) are twins
+
+
+def test_margin_loss_zero_when_twins_are_separated():
+    torch = pytest.importorskip("torch")
+    from deberta import pairwise_margin_loss
+
+    assert pairwise_margin_loss(torch.tensor([3.0]), torch.tensor([1.0])).item() == 0.0
+    assert pairwise_margin_loss(torch.tensor([1.0]), torch.tensor([1.0])).item() == 1.0
+    assert pairwise_margin_loss(torch.tensor([]), torch.tensor([])).item() == 0.0
+    # Mean over pairs: one violated by 0.5, one satisfied.
+    assert pairwise_margin_loss(torch.tensor([1.5, 5.0]), torch.tensor([1.0, 0.0])).item() == 0.25
+
+
+def test_pairwise_needs_groups(tiny):
+    tiny.pairwise_weight = 0.5
+    with pytest.raises(ValueError, match="groups"):
+        tiny.fit(TEXTS, LABELS)
+
+
+def test_pairwise_needs_at_least_one_twin_pair(tiny):
+    # Every row in its own group: a "row 2" run would silently train as row 1.
+    tiny.pairwise_weight = 0.5
+    with pytest.raises(ValueError, match="no clean/attacked twin pairs"):
+        tiny.fit(TEXTS, LABELS, groups=[f"solo{i}" for i in range(16)])
+
+
+def test_weight_zero_keeps_single_row_units(tiny):
+    # Row 1 runs (weight 0) must batch exactly as before Task 6, groups or not.
+    assert tiny._units(16, TWIN_GROUPS, LABELS) == [[i] for i in range(16)]
+
+
+def test_twin_pairs_become_units(tiny):
+    tiny.pairwise_weight = 0.5
+    groups = TWIN_GROUPS[:8] + [f"solo{i}" for i in range(8)]   # rows 8-15 lose their twins
+    groups[8] = "g0"                                             # only (0, 8) stays a pair
+    units = tiny._units(16, groups, LABELS)
+    assert [0, 8] in units
+    assert sorted(i for unit in units for i in unit) == list(range(16))
+    assert all(len(unit) == 1 for unit in units if unit != [0, 8])
+
+
+def test_twins_share_a_batch(tiny, monkeypatch):
+    tiny.pairwise_weight = 0.5
+    seen = []
+    step = tiny._train_step
+
+    def record(units, *args, **kwargs):
+        seen.append({i for unit in units for i in unit})
+        return step(units, *args, **kwargs)
+
+    monkeypatch.setattr(tiny, "_train_step", record)
+    tiny.fit(TEXTS, LABELS, groups=TWIN_GROUPS)
+    assert seen and all(len(batch) <= tiny.batch_size for batch in seen)
+    for batch in seen:
+        for i in batch:
+            assert (i + 8) % 16 in batch
+
+
+def test_loss_is_bce_plus_weighted_margin(tiny):
+    import torch
+
+    tiny.pairwise_weight = 0.5
+    units = [[0, 1], [2]]                                 # one pair (attacked 0, clean 1), one single
+    doc_logits = torch.tensor([0.5, 0.25, -1.0])
+    labels = torch.tensor([1.0, 0.0, 0.0])
+    bce = torch.nn.functional.binary_cross_entropy_with_logits(doc_logits, labels)
+    margin = 1.0 - (0.5 - 0.25)
+    assert tiny._loss(units, doc_logits, labels).item() == pytest.approx(bce.item() + 0.5 * margin)
+    tiny.pairwise_weight = 0.0
+    assert tiny._loss(units, doc_logits, labels).item() == pytest.approx(bce.item())
+
+
+def test_pairwise_fit_trains_and_scores(tiny):
+    tiny.pairwise_weight = 1.0
+    scores = tiny.fit(TEXTS, LABELS, groups=TWIN_GROUPS, val=(TEXTS, LABELS)).predict_proba(TEXTS)
+    assert scores.shape == (16,) and np.isfinite(scores).all()
+    assert tiny.n_twin_pairs == 8
+

@@ -49,3 +49,13 @@ def test_bipia_only_trains_on_bipia_rows(tiny, dataset_path, tmp_path, monkeypat
                       "--data", str(dataset_path)])
     assert all(g.startswith("bipia") for g in seen["groups"])
     assert seen["val_n"] == 48  # val is the full train_pool val, both sources (spec decision 13)
+
+
+def test_pairwise_run_records_its_twin_pairs(tiny, dataset_path, tmp_path):
+    model = tmp_path / "model"
+    deberta_run.main(["train", "--row", "row2", "--seed", "7267", "--model-out", str(model),
+                      "--pairwise-weight", "0.5", "--epochs", "1", "--no-fp16",
+                      "--device", "cpu", "--data", str(dataset_path)])
+    run = json.loads((model / "run.json").read_text())
+    assert run["pairwise_weight"] == 0.5
+    assert run["twin_pairs"] > 0
