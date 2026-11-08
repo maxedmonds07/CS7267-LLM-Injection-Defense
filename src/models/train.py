@@ -21,6 +21,7 @@ from dataset import DEFAULT_PATH
 from harness import evaluate, load_data
 from metrics import auroc
 from perplexity import PerplexityDetector
+from precomputed import PrecomputedScores
 from tfidf import TfidfDetector
 
 EXPERIMENT = "phase3-detectors"
@@ -30,8 +31,14 @@ SHOWN = ["eval_set", "slice", "n_benign", "n_adversarial", "auroc", "auroc_lo", 
 
 
 def fit_detector(name, data, *, ppl_model="distilbert/distilgpt2", ppl_max_context=512,
-                 ppl_stride=256, ppl_device=None):
-    """Fit on train_pool train; B0 perplexity uses a frozen pretrained LM."""
+                 ppl_stride=256, ppl_device=None, scores=None):
+    """Fit on train_pool train; B0 perplexity uses a frozen pretrained LM; B2 deberta was
+    trained on Colab and is read from its score file."""
+    if name == "deberta":
+        if not scores:
+            raise ValueError("--detector deberta needs --scores report/deberta_scores/<run>.parquet")
+        detector = PrecomputedScores(scores)
+        return detector, detector.params
     if name == "length":
         return LengthBaseline().fit(data.train.text, data.train.label), {}
     if name == "perplexity":
@@ -95,7 +102,7 @@ def log_run(uri, name, params, threshold, args, report, detector):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("--detector", choices=["length", "tfidf", "perplexity"], required=True)
+    parser.add_argument("--detector", choices=["length", "tfidf", "perplexity", "deberta"], required=True)
     parser.add_argument("--ppl-model", default="distilbert/distilgpt2",
                         help="Frozen causal language model for B0 perplexity")
     parser.add_argument("--ppl-max-context", type=int, default=512,
@@ -103,17 +110,20 @@ def main(argv=None):
     parser.add_argument("--ppl-stride", type=int, default=256,
                         help="New tokens scored in each window")
     parser.add_argument("--ppl-device", default=None, help="cpu, cuda or mps (default: auto)")
+    parser.add_argument("--scores", help="B2 score file written by deberta_run.py score")
     parser.add_argument("--data", default=str(DEFAULT_PATH), help="dataset.parquet to read")
     parser.add_argument("--target-fpr", type=float, default=0.01)
     parser.add_argument("--n-boot", type=int, default=1000)
     parser.add_argument("--tracking-uri", default=os.environ.get("MLFLOW_TRACKING_URI"))
     args = parser.parse_args(argv)
+    if args.detector == "deberta" and not args.scores:
+        parser.error("--detector deberta needs --scores report/deberta_scores/<run>.parquet")
 
     data = load_data(args.data)
     detector, params = fit_detector(
         args.detector, data, ppl_model=args.ppl_model,
         ppl_max_context=args.ppl_max_context, ppl_stride=args.ppl_stride,
-        ppl_device=args.ppl_device,
+        ppl_device=args.ppl_device, scores=args.scores,
     )
     threshold, report = evaluate(detector, data, args.target_fpr, args.n_boot)
     if args.detector == "length":

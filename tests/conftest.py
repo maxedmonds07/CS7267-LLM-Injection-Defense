@@ -45,3 +45,28 @@ def dataset_path(tmp_path):
     target = tmp_path / "dataset.parquet"
     pq.write_table(pa.Table.from_pylist(rows), target)
     return target
+
+
+@pytest.fixture
+def tiny(monkeypatch):
+    """A DebertaDetector whose backbone is a tiny random DeBERTa-v2, with the real
+    deberta-v3-base tokenizer (a small, cached download; skipped when offline)."""
+    pytest.importorskip("torch")
+    transformers = pytest.importorskip("transformers")
+    from deberta import DebertaDetector
+
+    try:
+        transformers.AutoTokenizer.from_pretrained("microsoft/deberta-v3-base")
+    except OSError:
+        pytest.skip("deberta-v3-base tokenizer not available offline")
+
+    def tiny_model(self):
+        config = transformers.DebertaV2Config(
+            vocab_size=len(self.tokenizer), hidden_size=32, num_hidden_layers=2,
+            num_attention_heads=2, intermediate_size=37, num_labels=1,
+            pad_token_id=self.tokenizer.pad_token_id,
+        )
+        return transformers.AutoModelForSequenceClassification.from_config(config)
+
+    monkeypatch.setattr(DebertaDetector, "_init_model", tiny_model)
+    return DebertaDetector(epochs=2, batch_size=4, fp16=False, device="cpu")

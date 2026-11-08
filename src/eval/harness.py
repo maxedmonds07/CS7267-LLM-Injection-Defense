@@ -7,7 +7,7 @@ from metrics import auroc, bootstrap_auroc_ci, length_separability, rates_at_thr
 from dataclasses import dataclass
 from dataset import DEFAULT_PATH, load
 
-COLUMNS = ["text", "label", "source", "attack_kind", "attack_surface"]
+COLUMNS = ["text", "label", "source", "attack_kind", "attack_surface", "group"]
 
 @dataclass
 class Data:
