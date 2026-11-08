@@ -32,6 +32,7 @@
   - seeds `(7267, 7268, 7269)`
   - `fp16=True` on CUDA only
 - **Epoch selection:** highest val TPR at 1% val FPR (threshold from val benign scores, TPR on val adversarial), ties broken by val AUROC.
+- **Selection between runs** (sweep weight, row 3's base row, selected configuration): highest mean val TPR at 1% val FPR, ties broken by the **lowest mean val log-loss** (spec amendment 2026-11-08: val saturates, so AUROC ties are noise).
 - **Matched FPR for the verdict:** `MATCHED_FPR = 0.05`, measured on the eval slice's own benign rows. For measurement only.
 - **Bootstrap:** `n_boot=1000`, seed `7267`, 95% percentile interval, benign and adversarial rows resampled separately. Statistics that set a threshold or bins recompute them inside each replicate.
 - **Score files:** `report/deberta_scores/<run_name>.parquet`, DVC-tracked as one directory. Run names are `row{1..4}-s{seed}` and `sweep-row2-w{weight}-s7267`.
@@ -752,8 +753,8 @@ Done 2026-11-08, stacked on `phase3/eval-metrics` (PR #31) while that PR was ope
   - `harness.evaluate` and `load_data`
   - the regenerated `report/baselines/b1_tfidf_lr.csv` (Task 2)
 - Produces:
-  - `val_selection_score(score_file) -> tuple[float, float]`: `(val TPR at 1% val FPR, val AUROC)` from the file's `val` rows.
-  - `select_configuration(files_by_row: dict[str, list[Path]]) -> str`: the row with the highest mean val TPR across its seeds, ties broken by mean val AUROC. It reads **only** `val` rows.
+  - `val_selection_score(score_file) -> tuple[float, float, float]`: `(val TPR at 1% val FPR, val AUROC, val log-loss)` from the file's `val` rows.
+  - `select_configuration(files_by_row: dict[str, list[Path]]) -> str`: the row with the highest mean val TPR across its seeds, ties broken by the lowest mean val log-loss (amended 2026-11-08; was mean val AUROC). It reads **only** `val` rows.
   - `seed_passes(report: pd.DataFrame, b1_tpr: float) -> bool`: on `eval_set == "mcptox"`, `slice == "all"`, true when `tpr_at_matched_fpr_lo > b1_tpr` and `length_binned_auroc_lo > 0.5`.
   - `verdict(passes: list[bool]) -> str`: `"pass"` if all pass, `"fail"` if none pass, otherwise `"mixed"`.
   - CLI `python src/eval/verdict.py --scores-dir report/deberta_scores --b1 report/baselines/b1_tfidf_lr.csv --out-dir report/baselines`. It writes `b2_deberta_<row>.csv` per row (the report columns plus `seed`) and `b2_verdict.md`: the selected row, B1's bar, and every seed's two lower bounds with pass or fail.
@@ -809,11 +810,11 @@ git commit -m "Add configuration selection on val and the B2 verdict against B1"
 
 Branch `phase3/deberta-results` (lead plus whoever runs Colab). This task is operational. Its checks are the outputs listed.
 
-- [ ] **Step 1: Sweep row 2's weight** (one seed, val only): `sweep-row2-w0.5-s7267` and `sweep-row2-w1.0-s7267`, with `VAL_ONLY=True`. Pick the weight with the higher val TPR at 1% FPR. Ties go to the higher val AUROC.
-- [ ] **Step 2: Reported runs, 3 seeds each:**
+- [ ] **Step 1: Sweep row 2's weight** (one seed, val only): `sweep-row2-w0.5-s7267` and `sweep-row2-w1.0-s7267`, with `VAL_ONLY=True`. Pick the weight with the higher val TPR at 1% FPR. Ties go to the lower val log-loss (amended 2026-11-08). Per file: `PYTHONPATH=src/data:src/eval:src/models uv run python -c "from verdict import val_selection_score as v; print(v('FILE'))"` prints `(tpr, auroc, log_loss)`.
+- [ ] **Step 2: Reported runs, 3 seeds each:** (`row1-s7267` done 2026-11-08: 17.7 min training on T4 fp16, val TPR 1.0, val AUROC 0.99997, selected epoch 2; scored, not yet evaluated)
   - `row1-s{7267,7268,7269}` (pairwise 0)
   - `row2-s{...}` (chosen weight)
-  - `row3-s{...}`: BIPIA only, with the weight of whichever of rows 1–2 has the higher mean val TPR. Decide that from the val rows of their score files before row 3 starts.
+  - `row3-s{...}`: BIPIA only, with the weight of whichever of rows 1–2 has the higher mean val TPR. Decide that from the val rows of their score files before row 3 starts, ties by lower mean val log-loss.
   - Row 4 only if Task 9 has merged and there is time before Nov 23.
   - Score every reported run with `VAL_ONLY=False`.
 - [ ] **Step 3: Bring the score files into the repo and track them**

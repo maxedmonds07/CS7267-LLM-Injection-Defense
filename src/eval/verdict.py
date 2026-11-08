@@ -27,11 +27,20 @@ from precomputed import PrecomputedScores
 
 SELECTION_FPR = 0.01
 LENGTH_FLOOR = 0.5
+LOG_LOSS_CLIP = 1e-7
 
 
-def val_selection_score(score_file) -> tuple[float, float]:
-    """(val TPR at 1% val FPR, val AUROC) from the file's val rows only, the same rule
-    DebertaDetector uses to choose an epoch."""
+def val_log_loss(scores, labels) -> float:
+    """Mean binary cross-entropy of probability scores, clipped so a saturated 0 or 1 costs
+    at most -log(1e-7). Still varies when val TPR and AUROC are saturated."""
+    p = np.clip(np.asarray(scores, dtype=float), LOG_LOSS_CLIP, 1 - LOG_LOSS_CLIP)
+    y = np.asarray(labels, dtype=float)
+    return float(-np.mean(y * np.log(p) + (1 - y) * np.log(1 - p)))
+
+
+def val_selection_score(score_file) -> tuple[float, float, float]:
+    """(val TPR at 1% val FPR, val AUROC, val log-loss) from the file's val rows only. AUROC
+    is reported; between runs, TPR ties are broken by log-loss (spec amendment 2026-11-08)."""
     frame = pq.read_table(score_file, columns=["eval_set", "label", "score"]).to_pandas()
     val = frame[frame.eval_set == "val"]
     scores, labels = val.score.to_numpy(float), val.label.to_numpy()
@@ -39,22 +48,24 @@ def val_selection_score(score_file) -> tuple[float, float]:
         raise ValueError(f"{score_file}: val rows need both labels to select on")
     threshold = threshold_at_fpr(scores[labels == 0], SELECTION_FPR)
     tpr, _ = rates_at_threshold(scores, labels, threshold)
-    return tpr, auroc(scores, labels)
+    return tpr, auroc(scores, labels), val_log_loss(scores, labels)
 
 
 def val_means(files_by_row: dict) -> dict:
-    """{row: (mean val TPR, mean val AUROC)} across each row's seeds. Reads only val rows."""
-    means = {}
-    for row, files in files_by_row.items():
-        values = np.array([val_selection_score(f) for f in files], dtype=float)
-        means[row] = (float(values[:, 0].mean()), float(values[:, 1].mean()))
-    return means
+    """{row: (mean val TPR, mean val AUROC, mean val log-loss)} across each row's seeds.
+    Reads only val rows."""
+    return {
+        row: tuple(float(v) for v in np.array([val_selection_score(f) for f in files]).mean(axis=0))
+        for row, files in files_by_row.items()
+    }
 
 
 def select_configuration(files_by_row: dict) -> str:
-    """The row with the highest mean val TPR across its seeds, ties broken by mean val AUROC."""
+    """The row with the highest mean val TPR across its seeds, ties broken by the lowest mean
+    val log-loss. Val AUROC saturates near 1.0, so it no longer breaks ties (spec amendment
+    2026-11-08)."""
     means = val_means(files_by_row)
-    return max(sorted(means), key=lambda row: means[row])
+    return max(sorted(means), key=lambda row: (means[row][0], -means[row][2]))
 
 
 def _mcptox_all(report: pd.DataFrame) -> pd.Series:
@@ -100,7 +111,7 @@ def write_verdict(path, *, selected, bar, b1_path, selection, seed_rows, result,
         f"**Verdict: {result}**",
         "",
         f"- Selected configuration: **{selected}**, chosen on train_pool val only (highest mean val "
-        f"TPR at {SELECTION_FPR:.0%} val FPR across seeds, ties by mean val AUROC).",
+        f"TPR at {SELECTION_FPR:.0%} val FPR across seeds, ties by lowest mean val log-loss).",
         f"- B1 bar: TPR at 5% FPR on MCPTox = **{_fmt(bar)}** (`{b1_path}`).",
         f"- A seed passes when, on MCPTox, its TPR-at-5%-FPR 95% lower bound is above the B1 bar "
         f"and its length-binned AUROC 95% lower bound is above {LENGTH_FLOOR}.",
@@ -109,12 +120,12 @@ def write_verdict(path, *, selected, bar, b1_path, selection, seed_rows, result,
         "",
         "## Selection on val",
         "",
-        "| row | seeds | mean val TPR @1% FPR | mean val AUROC |",
-        "|---|---|---|---|",
+        "| row | seeds | mean val TPR @1% FPR | mean val log-loss | mean val AUROC |",
+        "|---|---|---|---|---|",
     ]
-    for row, (n, tpr, roc) in sorted(selection.items()):
+    for row, (n, tpr, roc, loss) in sorted(selection.items()):
         mark = " (selected)" if row == selected else ""
-        lines.append(f"| {row}{mark} | {n} | {_fmt(tpr)} | {_fmt(roc)} |")
+        lines.append(f"| {row}{mark} | {n} | {_fmt(tpr)} | {loss:.6f} | {_fmt(roc)} |")
     lines += [
         "",
         f"## {selected} on MCPTox, every seed",
@@ -136,11 +147,12 @@ def write_verdict(path, *, selected, bar, b1_path, selection, seed_rows, result,
             "",
             "Not reported runs: val numbers only, never scored on the holdouts.",
             "",
-            "| run | row | seed | val TPR @1% FPR | val AUROC |",
-            "|---|---|---|---|---|",
+            "| run | row | seed | val TPR @1% FPR | val log-loss | val AUROC |",
+            "|---|---|---|---|---|---|",
         ]
         for s in sweeps:
-            lines.append(f"| {s['run']} | {s['row']} | {s['seed']} | {_fmt(s['tpr'])} | {_fmt(s['auroc'])} |")
+            lines.append(f"| {s['run']} | {s['row']} | {s['seed']} | {_fmt(s['tpr'])} | "
+                         f"{s['log_loss']:.6f} | {_fmt(s['auroc'])} |")
     Path(path).write_text("\n".join(lines) + "\n")
 
 
@@ -158,9 +170,9 @@ def main(argv=None):
     for path in files:
         scores = PrecomputedScores(path)
         if scores.val_only:
-            tpr, roc = val_selection_score(path)
+            tpr, roc, loss = val_selection_score(path)
             sweeps.append({"run": path.stem, "row": scores.params["row"], "seed": scores.seed,
-                           "tpr": tpr, "auroc": roc})
+                           "tpr": tpr, "auroc": roc, "log_loss": loss})
         else:
             reported[scores.params["row"]].append(path)
     if not reported:

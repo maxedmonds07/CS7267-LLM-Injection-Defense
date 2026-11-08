@@ -71,7 +71,20 @@ def test_val_selection_score_uses_val_rows(dataset_path, tmp_path):
     # Perfect on val, inverted everywhere else: only val may count.
     path = _write(tmp_path / "a.parquet", data, "row1", 7267,
                   lambda name, frame: _oracle(name, frame) if name == "val" else _inverted(name, frame))
-    assert val_selection_score(path) == (1.0, 1.0)
+    tpr, roc, loss = val_selection_score(path)
+    assert (tpr, roc) == (1.0, 1.0)
+    assert loss == pytest.approx(-np.log(1 - 1e-7))       # perfect scores, clipped
+
+
+def test_val_log_loss_rewards_confident_correct_scores(dataset_path, tmp_path):
+    data = load_data(dataset_path)
+    sharp = _write(tmp_path / "sharp.parquet", data, "row1", 7267,
+                   lambda name, frame: 0.02 + 0.96 * _oracle(name, frame))
+    soft = _write(tmp_path / "soft.parquet", data, "row2", 7267,
+                  lambda name, frame: 0.4 + 0.2 * _oracle(name, frame))
+    # Both separate val perfectly; only log-loss can tell them apart.
+    assert val_selection_score(sharp)[:2] == val_selection_score(soft)[:2] == (1.0, 1.0)
+    assert val_selection_score(sharp)[2] < val_selection_score(soft)[2]
 
 
 def test_selection_never_reads_holdout_rows(dataset_path, tmp_path):
@@ -84,12 +97,14 @@ def test_selection_never_reads_holdout_rows(dataset_path, tmp_path):
     assert select_configuration({"row1": [a], "row2": [b]}) == "row1"
 
 
-def test_selection_uses_the_mean_over_seeds_then_auroc(monkeypatch):
-    fake = {"r1a": (1.0, 0.90), "r1b": (0.2, 0.90),   # mean TPR 0.6
-            "r2a": (0.7, 0.80), "r2b": (0.7, 0.80),   # mean TPR 0.7: wins on TPR
-            "r3a": (0.7, 0.95), "r3b": (0.7, 0.95)}   # ties row2 on TPR, wins on AUROC
+def test_selection_uses_the_mean_over_seeds_then_log_loss(monkeypatch):
+    # (val TPR, val AUROC, val log-loss)
+    fake = {"r1a": (1.0, 0.90, 0.1), "r1b": (0.2, 0.90, 0.1),   # mean TPR 0.6
+            "r2a": (0.7, 0.99, 0.3), "r2b": (0.7, 0.99, 0.3),   # mean TPR 0.7: beats row1 on TPR
+            "r3a": (0.7, 0.80, 0.2), "r3b": (0.7, 0.80, 0.2)}   # ties row2; lower log-loss wins
     monkeypatch.setattr(verdict_module, "val_selection_score", lambda path: fake[path])
     assert select_configuration({"row1": ["r1a", "r1b"], "row2": ["r2a", "r2b"]}) == "row2"
+    # Row 3 wins on log-loss even though its AUROC is lower: AUROC no longer breaks ties.
     assert select_configuration({"row1": ["r1a", "r1b"], "row2": ["r2a", "r2b"],
                                  "row3": ["r3a", "r3b"]}) == "row3"
 
@@ -120,6 +135,7 @@ def test_cli_writes_seed_column_and_verdict(dataset_path, tmp_path):
     assert "row1" in text and "0.19" in text
     assert "sweep-row2-w0.5-s7267" in text                      # appendix, val numbers only
     assert "**Verdict: pass**" in text
+    assert "log-loss" in text
 
 
 def test_cli_refuses_without_reported_runs(dataset_path, tmp_path):
