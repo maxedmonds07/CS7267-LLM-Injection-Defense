@@ -75,3 +75,21 @@ def test_single_label_slice_reports_tpr_only(dataset_path):
     assert row.tpr == 1.0
     for column in ("auroc", "auroc_lo", "auroc_hi", "fpr", "length_separability"):
         assert math.isnan(row[column])
+
+
+def test_report_has_matched_fpr_and_length_binned_columns(dataset_path):
+    data = load_data(dataset_path)
+    _, report = evaluate(Oracle(), data, n_boot=20)
+    row = report.query("eval_set == 'mcptox' and slice == 'all'").iloc[0]
+    assert row.tpr_at_matched_fpr == 1.0
+    assert row.length_binned_auroc == 1.0
+    assert row.tpr_at_matched_fpr_lo <= row.tpr_at_matched_fpr <= row.tpr_at_matched_fpr_hi
+    assert row.length_binned_auroc_lo <= row.length_binned_auroc <= row.length_binned_auroc_hi
+
+
+def test_single_label_slice_has_nan_new_metrics(dataset_path):
+    _, report = evaluate(Oracle(), load_data(dataset_path), n_boot=20)
+    row = report.query("eval_set == 'msb' and slice == 'attack_surface=tool_output'").iloc[0]
+    for column in ("tpr_at_matched_fpr", "tpr_at_matched_fpr_lo", "tpr_at_matched_fpr_hi",
+                   "length_binned_auroc", "length_binned_auroc_lo", "length_binned_auroc_hi"):
+        assert math.isnan(row[column])

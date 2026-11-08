@@ -128,4 +128,4 @@ DETECTOR ?= tfidf
 UV_GROUP = $(if $(filter perplexity,$(DETECTOR)),--group perplexity,)
 
 evaluate: ## Fit and evaluate the selected detector
-	PYTHONPATH="$(SRC_PATH)" uv run $(UV_GROUP) python src/models/train.py --detector $(DETECTOR) $(if $(SCORES),--scores $(SCORES),)
+	PYTHONPATH="$(SRC_PATH)" uv run $(UV_GROUP) python src/models/train.py --detector $(DETECTOR) $(if $(SCORES),--scores $(SCORES),) $(if $(OUT),--out $(OUT),)

@@ -27,7 +27,8 @@ from tfidf import TfidfDetector
 EXPERIMENT = "phase3-detectors"
 TFIDF_C_GRID = (0.1, 1.0, 10.0)
 SHOWN = ["eval_set", "slice", "n_benign", "n_adversarial", "auroc", "auroc_lo", "auroc_hi", "auroc_length",
-         "tpr", "tpr_length", "fpr"]
+         "tpr", "tpr_length", "fpr", "tpr_at_matched_fpr", "length_binned_auroc"]
+LOGGED = ("auroc", "tpr", "fpr", "tpr_at_matched_fpr", "length_binned_auroc")
 
 
 def fit_detector(name, data, *, ppl_model="distilbert/distilgpt2", ppl_max_context=512,
@@ -60,11 +61,12 @@ def fit_detector(name, data, *, ppl_model="distilbert/distilgpt2", ppl_max_conte
 
 
 def metric_items(report):
-    """MLflow names as {metric}/{eval_set}/{slice}; MLflow keys cannot contain "=". NaN is dropped."""
+    """MLflow names as {metric}/{eval_set}/{slice}; MLflow keys cannot contain "=". NaN and absent
+    metrics are dropped."""
     items = {}
     for row in report.itertuples():
-        for metric in ("auroc", "tpr", "fpr"):
-            value = getattr(row, metric)
+        for metric in LOGGED:
+            value = getattr(row, metric, math.nan)
             if not math.isnan(value):
                 items[f"{metric}/{row.eval_set}/{row.slice}".replace("=", "-")] = float(value)
     return items
@@ -114,6 +116,7 @@ def main(argv=None):
     parser.add_argument("--data", default=str(DEFAULT_PATH), help="dataset.parquet to read")
     parser.add_argument("--target-fpr", type=float, default=0.01)
     parser.add_argument("--n-boot", type=int, default=1000)
+    parser.add_argument("--out", help="Write the detector's report CSV here")
     parser.add_argument("--tracking-uri", default=os.environ.get("MLFLOW_TRACKING_URI"))
     args = parser.parse_args(argv)
     if args.detector == "deberta" and not args.scores:
@@ -133,6 +136,10 @@ def main(argv=None):
         shown = compare(report, reference)
 
     print(f"{detector.name}: threshold {threshold:.6g} at {args.target_fpr:.0%} FPR on val; {params or 'no hyperparameters'}")
+    if args.out:
+        Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+        report.to_csv(args.out, index=False)
+        print(f"wrote {args.out}")
     print(shown[SHOWN].to_string(index=False, float_format=lambda v: f"{v:.3f}"))
     if args.tracking_uri:
         log_run(args.tracking_uri, detector.name, params, threshold, args, report, detector)
