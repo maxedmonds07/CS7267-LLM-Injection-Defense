@@ -610,7 +610,9 @@ git commit -m "Add the DeBERTa run CLI, score files, and evaluation from precomp
 
 ### Task 8: Colab notebook
 
-Branch `phase3/deberta-colab` (stream 2). It can be written against Task 7's CLI before Task 7 merges, but it can only run once Task 7 has merged.
+Branch `phase3/deberta-colab` (stream 2).
+
+Notes from implementation (2026-11-08): the notebook refuses `PAIRWISE_WEIGHT > 0` until `pairwise_margin_loss` exists on the cloned branch, because `fit` currently ignores the weight and the run would be mislabelled. It refuses `WITH_SYNTHETIC` until Task 9 adds `--with-synthetic`. Every `uv run` passes `--group deberta` so a plain `uv run` cannot drop torch from the env. It can be written against Task 7's CLI before Task 7 merges, but it can only run once Task 7 has merged.
 
 **Files:**
 - Create: `notebooks/deberta_colab.ipynb`
@@ -620,7 +622,7 @@ Branch `phase3/deberta-colab` (stream 2). It can be written against Task 7's CLI
 - Consumes: the `deberta_run.py` CLI (Task 7). It calls nothing else.
 - Produces: score files and model directories on Drive under `/content/drive/MyDrive/cs7267-deberta/<run_name>/` (`ckpt/`, `model/`, `scores.parquet`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 NB = Path("notebooks/deberta_colab.ipynb")
@@ -639,12 +641,12 @@ def test_notebook_reads_keys_only_from_colab_secrets():
     assert not re.search(r"print\([^)]*(KEY|SECRET)", source)
 ```
 
-- [ ] **Step 2: Run and see it fail**
+- [x] **Step 2: Run and see it fail**
 
 Run: `uv run pytest tests/test_notebook.py -v`
 Expected: FAIL with `FileNotFoundError`.
 
-- [ ] **Step 3: Write the notebook**
+- [x] **Step 3: Write the notebook**
 
 Cells, in order. All logic stays in `src/`.
 1. A markdown header: the spec link, the "Colab R2 token" rules, and the run-name convention.
@@ -659,12 +661,12 @@ Cells, in order. All logic stays in `src/`.
 
 Clear all outputs before saving (Edit → Clear all outputs), or run `jupyter nbconvert --clear-output --inplace`.
 
-- [ ] **Step 4: Run the test and see it pass**
+- [x] **Step 4: Run the test and see it pass**
 
 Run: `uv run pytest tests/test_notebook.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Smoke test on Colab** (needs the token from the spec's "Colab R2 token" section)
+- [ ] **Step 5: Smoke test on Colab** (pending: needs a person with the Colab token; the notebook's defaults are already the smoke settings, `ROW="smoke"`, `LIMIT=200`, `VAL_ONLY=True`) (needs the token from the spec's "Colab R2 token" section)
 
 - First, on the lead's machine, with the Colab token in the env: `make r2-check` passes and `make r2-check-write` **fails**.
 - In Colab: `LIMIT=200`, `FP16=True`, `ROW="smoke"`. Expected: training finishes with no `FloatingPointError`.
@@ -672,7 +674,7 @@ Expected: PASS.
 - Disconnect test: start a full run, use Runtime → Disconnect after epoch 1's checkpoint appears on Drive, rerun cell 8, and confirm the log says it resumed from epoch 1.
 - Note the minutes per full epoch in the PR description: it confirms or revises the spec's 6–9 hour estimate.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add notebooks/deberta_colab.ipynb tests/test_notebook.py
