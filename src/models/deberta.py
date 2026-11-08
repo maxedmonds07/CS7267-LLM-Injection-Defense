@@ -10,7 +10,6 @@ Install the optional dependencies with ``uv sync --group deberta``. This module 
 without torch; torch and transformers are imported where they are used.
 """
 
-import math
 from collections import defaultdict
 
 
@@ -46,6 +45,19 @@ def twin_pairs(groups, labels) -> list[tuple[int, int]]:
         if {labels[first], labels[second]} == {0, 1}:
             pairs.append((first, second) if labels[first] == 1 else (second, first))
     return pairs
+
+
+PAIRWISE_MARGIN = 1.0
+
+
+def pairwise_margin_loss(attacked_logits, clean_logits, margin=PAIRWISE_MARGIN):
+    """Mean of relu(margin - (attacked - clean)) over twin pairs: each attacked text should
+    out-score its own clean twin by at least `margin` logits. 0.0 when there are no pairs."""
+    import torch
+
+    if attacked_logits.numel() == 0:
+        return torch.zeros((), device=attacked_logits.device, dtype=attacked_logits.dtype)
+    return torch.relu(margin - (attacked_logits - clean_logits)).mean()
 
 
 def select_epoch(history: list[dict]) -> int:
@@ -88,6 +100,7 @@ class DebertaDetector:
         self.history = []
         self.selected_epoch = None
         self.resumed_from_epoch = 0
+        self.n_twin_pairs = 0
 
     # --- building blocks ---------------------------------------------------------------
 
@@ -153,12 +166,29 @@ class DebertaDetector:
         out = torch.full((len(token_lists),), float("-inf"), device=chunk.device, dtype=chunk.dtype)
         return out.scatter_reduce(0, index, chunk, reduce="amax")
 
-    def _loss(self, units, doc_logits, labels):
-        """BCE on text-level max logits. `units` are lists of row indices; doc_logits and labels
-        follow the order of the flattened units."""
+    def _loss(self, units, doc_logits, labels, n_rows=None, n_pairs=None):
+        """This micro-batch's share of the batch loss: BCE on text-level max logits, plus
+        pairwise_weight x the margin loss over twin pairs. `units` are lists of row indices
+        (a pair is [attacked, clean]); doc_logits and labels follow the flattened units.
+        n_rows and n_pairs are the whole batch's counts, so summing the shares over
+        micro-batches gives the batch's mean BCE plus the weighted mean margin over its pairs.
+        Left out, they default to this micro-batch's own counts (its plain mean loss)."""
         import torch
 
-        return torch.nn.functional.binary_cross_entropy_with_logits(doc_logits, labels)
+        rows = len(labels)
+        bce = torch.nn.functional.binary_cross_entropy_with_logits(doc_logits, labels)
+        loss = bce * (rows / (n_rows or rows))
+        if self.pairwise_weight > 0:
+            starts, offset = [], 0
+            for unit in units:
+                if len(unit) == 2:
+                    starts.append(offset)
+                offset += len(unit)
+            if starts:
+                index = torch.tensor(starts, device=doc_logits.device)
+                margin = pairwise_margin_loss(doc_logits[index], doc_logits[index + 1])
+                loss = loss + self.pairwise_weight * margin * (len(starts) / (n_pairs or len(starts)))
+        return loss
 
     def _micro_batches(self, units, token_lists):
         """Split units into groups whose window count stays under max_chunks (a unit is never
@@ -182,18 +212,18 @@ class DebertaDetector:
 
         device = self._torch_device()
         n_rows = sum(len(u) for u in units)
+        n_pairs = sum(len(u) == 2 for u in units)
         optimizer.zero_grad(set_to_none=True)
         total = 0.0
         for group in self._micro_batches(units, token_lists):
             rows = [i for unit in group for i in unit]
             doc_logits = self._doc_logits([token_lists[i] for i in rows])
             target = torch.tensor([float(labels[i]) for i in rows], device=device)
-            loss = self._loss(group, doc_logits, target)
-            if not torch.isfinite(loss):
+            share = self._loss(group, doc_logits, target, n_rows=n_rows, n_pairs=n_pairs)
+            if not torch.isfinite(share):
                 raise FloatingPointError(f"non-finite loss at epoch {epoch}; rerun with fp16=False")
-            scaled = loss * (len(rows) / n_rows)
-            (scaler.scale(scaled) if scaler else scaled).backward()
-            total += scaled.item()
+            (scaler.scale(share) if scaler else share).backward()
+            total += share.item()
         if scaler:
             scaler.step(optimizer)
             scaler.update()
@@ -203,8 +233,21 @@ class DebertaDetector:
         return total
 
     def _units(self, n_rows, groups, labels):
-        """Training units: one row each (Task 6 adds BIPIA twin pairs)."""
-        return [[i] for i in range(n_rows)]
+        """Training units. With pairwise_weight 0, one row each. Otherwise every clean/attacked
+        twin pair (BIPIA) is one unit [attacked, clean], so the twins always share a batch and
+        a micro-batch, and every other row (PoisonedRAG, unpaired rows) is a unit of one."""
+        if self.pairwise_weight <= 0:
+            self.n_twin_pairs = 0
+            return [[i] for i in range(n_rows)]
+        pairs = twin_pairs(list(groups), [int(label) for label in labels])
+        if not pairs:
+            raise ValueError("pairwise_weight > 0 but the training rows hold no clean/attacked "
+                             "twin pairs (groups with exactly one row of each label)")
+        self.n_twin_pairs = len(pairs)
+        unit_at = {min(pair): list(pair) for pair in pairs}
+        paired = {i for pair in pairs for i in pair}
+        return [unit_at[i] if i in unit_at else [i]
+                for i in range(n_rows) if i in unit_at or i not in paired]
 
     def _val_metrics(self, val):
         from metrics import auroc, rates_at_threshold, threshold_at_fpr
@@ -230,19 +273,25 @@ class DebertaDetector:
         from transformers import get_linear_schedule_with_warmup
 
         labels = list(labels)
+        texts = list(texts)
+        if self.pairwise_weight > 0 and groups is None:
+            raise ValueError("pairwise_weight > 0 needs groups to find the clean/attacked twins")
+        units = self._units(len(texts), groups, labels)
         if self.tokenizer is None:
             self.tokenizer = self._init_tokenizer()
         torch.manual_seed(self.seed)
         self.model = self._init_model().to(self._torch_device())
-        texts = list(texts)
         token_lists = self._encode(texts)
-        units = self._units(len(token_lists), groups, labels)
         self._fingerprint = self._data_fingerprint(texts, labels, groups, val)
 
-        steps_per_epoch = math.ceil(len(units) / max(1, self._units_per_batch(units)))
+        # Each epoch's shuffle depends only on seed + epoch, so the exact number of optimizer
+        # steps is known up front (pair units make batches uneven) and a resumed run replays
+        # exactly the batches an uninterrupted run would have seen.
+        orders = [np.random.default_rng(self.seed + epoch).permutation(len(units))
+                  for epoch in range(self.epochs)]
+        total_steps = sum(len(list(self._batches([units[k] for k in order]))) for order in orders)
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.lr)
-        scheduler = get_linear_schedule_with_warmup(
-            optimizer, int(0.06 * steps_per_epoch * self.epochs), steps_per_epoch * self.epochs)
+        scheduler = get_linear_schedule_with_warmup(optimizer, int(0.06 * total_steps), total_steps)
         scaler = torch.amp.GradScaler("cuda") if self._use_amp() else None
 
         self.history, best_state = [], None
@@ -251,13 +300,10 @@ class DebertaDetector:
             start, best_state = self._load_checkpoint(optimizer, scheduler, scaler)
         self.resumed_from_epoch = start
         for epoch in range(start, self.epochs):
-            # Each epoch's shuffle and dropout depend only on seed + epoch, so a resumed run
-            # replays exactly the batches an uninterrupted run would have seen.
-            torch.manual_seed(self.seed + epoch)
-            order = np.random.default_rng(self.seed + epoch).permutation(len(units))
+            torch.manual_seed(self.seed + epoch)  # dropout, likewise per epoch
             self.model.train()
             losses = []
-            for batch in self._batches([units[k] for k in order]):
+            for batch in self._batches([units[k] for k in orders[epoch]]):
                 losses.append(self._train_step(batch, token_lists, labels, optimizer, scheduler,
                                                scaler, epoch))
             entry = {"epoch": epoch, "loss": float(np.mean(losses))}
@@ -367,10 +413,6 @@ class DebertaDetector:
             best = self.history[select_epoch(self.history)]["epoch"]
             best_state = torch.load(dirs[best] / "model.pt", map_location="cpu", weights_only=True)
         return latest + 1, best_state
-
-    def _units_per_batch(self, units):
-        rows_per_unit = sum(len(u) for u in units) / max(1, len(units))
-        return max(1, int(self.batch_size // rows_per_unit))
 
     def _batches(self, units):
         """Consecutive units, up to batch_size rows per batch; a unit is never split."""
