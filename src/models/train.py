@@ -128,6 +128,10 @@ def main(argv=None):
         ppl_max_context=args.ppl_max_context, ppl_stride=args.ppl_stride,
         ppl_device=args.ppl_device, scores=args.scores,
     )
+    if isinstance(detector, PrecomputedScores):
+        detector.check_labels(data.val.text, data.val.label)
+        for frame in data.evals.values():
+            detector.check_labels(frame.text, frame.label)
     threshold, report = evaluate(detector, data, args.target_fpr, args.n_boot)
     if args.detector == "length":
         shown = report.assign(auroc_length=report.auroc, tpr_length=report.tpr)
