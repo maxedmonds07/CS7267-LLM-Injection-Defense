@@ -67,7 +67,7 @@ def select_epoch(history: list[dict]) -> int:
 
 CONFIG_FIELDS = (
     "model_name", "chunk_tokens", "chunk_stride", "pairwise_weight", "lr", "epochs",
-    "batch_size", "seed", "fp16", "max_chunks",
+    "batch_size", "seed", "fp16", "max_chunks", "max_grad_norm",
 )
 
 
@@ -78,7 +78,8 @@ class DebertaDetector:
 
     def __init__(self, model_name="microsoft/deberta-v3-base", chunk_tokens=256, chunk_stride=192,
                  pairwise_weight=0.0, lr=2e-5, epochs=3, batch_size=16, seed=7267,
-                 fp16=True, device=None, checkpoint_dir=None, max_chunks=32):
+                 fp16=True, device=None, checkpoint_dir=None, max_chunks=32,
+                 max_grad_norm=1.0):
         if not 1 <= chunk_stride <= chunk_tokens:
             raise ValueError("chunk_stride must be in [1, chunk_tokens]")
         self.model_name = model_name
@@ -95,6 +96,7 @@ class DebertaDetector:
         # Windows per forward pass. Training splits a batch into micro-batches under this budget
         # and accumulates gradients; no window is ever dropped.
         self.max_chunks = max_chunks
+        self.max_grad_norm = max_grad_norm
         self.tokenizer = None
         self.model = None
         self.history = []
@@ -224,6 +226,10 @@ class DebertaDetector:
                 raise FloatingPointError(f"non-finite loss at epoch {epoch}; rerun with fp16=False")
             (scaler.scale(share) if scaler else share).backward()
             total += share.item()
+        # Unscale before clipping: clip_grad_norm_ must see real gradients, not scaled ones.
+        if scaler:
+            scaler.unscale_(optimizer)
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
         if scaler:
             scaler.step(optimizer)
             scaler.update()
@@ -441,7 +447,10 @@ class DebertaDetector:
                 # and the ties would cost AUROC and matched-FPR TPR their ordering.
                 logits = self._doc_logits([token_lists[i] for i in rows]).detach().cpu().double()
                 scores.append(torch.sigmoid(logits))
-        return torch.cat(scores).numpy().astype(np.float64) if scores else np.zeros(0)
+        scores = torch.cat(scores).numpy().astype(np.float64) if scores else np.zeros(0, dtype=np.float64)
+        if not np.isfinite(scores).all():
+            raise FloatingPointError("non-finite score; rerun with fp16=False")
+        return scores
 
     def config(self) -> dict:
         return {field: getattr(self, field) for field in CONFIG_FIELDS}

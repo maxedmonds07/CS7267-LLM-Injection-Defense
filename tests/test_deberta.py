@@ -103,6 +103,35 @@ def test_nan_loss_raises_with_fp32_hint(tiny, monkeypatch):
         tiny.fit(TEXTS, LABELS)
 
 
+def test_nan_score_raises_with_fp32_hint(tiny, monkeypatch):
+    import torch
+
+    tiny.fit(TEXTS, LABELS)
+
+    def nan_logits(token_lists):
+        return torch.full((len(token_lists),), float("nan"))
+
+    monkeypatch.setattr(tiny, "_doc_logits", nan_logits)
+    with pytest.raises(FloatingPointError, match="fp16=False"):
+        tiny.predict_proba(TEXTS)
+
+
+def test_clips_gradients_at_one(tiny, monkeypatch):
+    import torch
+
+    seen = []
+    real = torch.nn.utils.clip_grad_norm_
+
+    def spy(parameters, max_norm, *args, **kwargs):
+        seen.append(max_norm)
+        return real(parameters, max_norm, *args, **kwargs)
+
+    monkeypatch.setattr(torch.nn.utils, "clip_grad_norm_", spy)
+    tiny.fit(TEXTS, LABELS)
+    assert seen
+    assert set(seen) == {1.0}
+
+
 def test_resume_matches_uninterrupted_run(tiny, tmp_path):
     from deberta import DebertaDetector
 

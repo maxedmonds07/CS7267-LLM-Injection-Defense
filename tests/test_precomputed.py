@@ -50,6 +50,15 @@ def test_deberta_needs_a_score_file(dataset_path):
         main(["--detector", "deberta", "--data", str(dataset_path)])
 
 
+def test_flipped_val_label_is_rejected(dataset_path, tmp_path):
+    data = load_data(dataset_path)
+    path = _write(tmp_path / "row1-s7267.parquet", data)
+    labels = data.val.label.to_numpy().copy()
+    labels[0] = 1 - int(labels[0])
+    with pytest.raises(ValueError, match="1 rows disagree"):
+        PrecomputedScores(path).check_labels(data.val.text, labels)
+
+
 def test_conflicting_duplicate_scores_rejected(dataset_path, tmp_path):
     data = load_data(dataset_path)
     frames = {"val": data.val.iloc[:2], "test": data.val.iloc[:2]}  # same texts twice
