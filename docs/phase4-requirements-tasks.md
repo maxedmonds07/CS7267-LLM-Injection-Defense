@@ -19,7 +19,7 @@ lists the tasks that remain.
 | Negative results documented honestly | **Partial** | Anti-goals and pass/fail rule fixed before training; `row1-s7267` FAILS (MCPTox AUROC 0.319); B0 below chance on holdouts | Not written up anywhere |
 | Reproducible via a single script | **Missing** | `make data` rebuilds the dataset; `make evaluate DETECTOR=...` runs one detector; `make b2-report` | No single entry point for all experiments; B2 training runs in Colab |
 | Config-driven (YAML) | **Partial** | `config.yaml` drives the data pipeline only | Detector and experiment settings are `argparse` defaults in `train.py` and `deberta_run.py` |
-| Version-controlled on GitHub | **Met** | PR workflow, DVC for data on R2, MLflow for runs | B2 score files not yet tracked (`report/deberta_scores/` is untracked) |
+| Version-controlled on GitHub | **Met** | PR workflow, DVC for data on R2, MLflow for runs | B2 score files are tracked in git under `report/deberta_scores/` (row 1, seeds 7267 and 7268) |
 | Unit-tested data and model components | **Mostly met** | 205 tests across data, metrics, harness, TF-IDF, perplexity, DeBERTa, verdict | New code (Optuna, CV, config loader) needs tests; three deferred minors |
 | README with full setup instructions | **Partial** | Setup, data, DVC, B0 and MLflow sections | Status line is stale; no B1 or B2 sections, no Colab steps, no "reproduce everything" section |
 
