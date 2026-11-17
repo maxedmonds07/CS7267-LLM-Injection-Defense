@@ -68,6 +68,10 @@ def evaluate(detector, data, target_fpr=0.01, n_boot=1000):
     and applied unchanged to every eval set and slice. tpr_at_matched_fpr is the exception: it
     sets its own threshold at MATCHED_FPR on each slice's benign rows, so detectors are compared
     at one FPR. It is a measurement, never a deployed threshold."""
+    if hasattr(detector, "check_labels"):
+        detector.check_labels(data.val.text, data.val.label)
+        for frame in data.evals.values():
+            detector.check_labels(frame.text, frame.label)
     val_scores = detector.predict_proba(data.val.text)
     threshold = threshold_at_fpr(val_scores[data.val.label.to_numpy() == 0], target_fpr)
     records = []

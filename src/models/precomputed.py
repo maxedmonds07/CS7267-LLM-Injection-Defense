@@ -21,7 +21,11 @@ class PrecomputedScores:
         conflicts = frame.groupby("text_sha256").score.nunique()
         if (conflicts > 1).any():
             raise ValueError(f"{int((conflicts > 1).sum())} texts have different scores in {path}")
+        label_conflicts = frame.groupby("text_sha256").label.nunique()
+        if (label_conflicts > 1).any():
+            raise ValueError(f"{int((label_conflicts > 1).sum())} texts have different labels in {path}")
         self._scores = dict(zip(frame.text_sha256, frame.score))
+        self._labels = {key: int(label) for key, label in zip(frame.text_sha256, frame.label)}
         self.name = f"deberta_{meta['row']}"
         self.seed = meta["seed"]
         self.val_only = bool(meta.get("val_only", False))
@@ -40,3 +44,13 @@ class PrecomputedScores:
         if missing:
             raise ValueError(f"{missing} of {len(keys)} rows have no score in {self.path}")
         return np.array([self._scores[k] for k in keys], dtype=float)
+
+    def check_labels(self, texts, labels):
+        """Raise if a score-file label disagrees with the dataset row it will be evaluated on."""
+        keys = [text_hash(t) for t in texts]
+        disagree = sum(
+            key in self._labels and self._labels[key] != int(label)
+            for key, label in zip(keys, labels)
+        )
+        if disagree:
+            raise ValueError(f"{disagree} rows disagree with labels in {self.path}")

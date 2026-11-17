@@ -103,6 +103,87 @@ def test_nan_loss_raises_with_fp32_hint(tiny, monkeypatch):
         tiny.fit(TEXTS, LABELS)
 
 
+def test_nan_score_raises_with_fp32_hint(tiny, monkeypatch):
+    import torch
+
+    tiny.fit(TEXTS, LABELS)
+
+    def nan_logits(token_lists):
+        return torch.full((len(token_lists),), float("nan"))
+
+    monkeypatch.setattr(tiny, "_doc_logits", nan_logits)
+    with pytest.raises(FloatingPointError, match="fp16=False"):
+        tiny.predict_proba(TEXTS)
+
+
+def test_fresh_detector_clips_at_one(tiny):
+    assert tiny.config()["max_grad_norm"] == 1.0
+
+
+def test_load_without_grad_clip_stays_unclipped(tiny, tmp_path):
+    import json
+
+    from deberta import DebertaDetector
+
+    tiny.fit(TEXTS, LABELS)
+    tiny.save(tmp_path / "m")
+    path = tmp_path / "m" / "detector.json"
+    saved = json.loads(path.read_text())
+    del saved["config"]["max_grad_norm"]
+    path.write_text(json.dumps(saved))
+    again = DebertaDetector.load(tmp_path / "m", device="cpu")
+    assert again.config()["max_grad_norm"] is None
+
+
+def test_clips_gradients_at_one(tiny, monkeypatch):
+    import torch
+
+    seen = []
+    real = torch.nn.utils.clip_grad_norm_
+
+    def spy(parameters, max_norm, *args, **kwargs):
+        seen.append(max_norm)
+        return real(parameters, max_norm, *args, **kwargs)
+
+    monkeypatch.setattr(torch.nn.utils, "clip_grad_norm_", spy)
+    tiny.fit(TEXTS, LABELS)
+    assert seen
+    assert set(seen) == {1.0}
+
+
+def test_unscales_before_clip(tiny, monkeypatch):
+    import torch
+
+    tiny.fit(TEXTS[:4], LABELS[:4])
+    order = []
+
+    class Scaler:
+        def scale(self, loss):
+            return loss
+
+        def unscale_(self, optimizer):
+            order.append("unscale")
+
+        def step(self, optimizer):
+            order.append("step")
+
+        def update(self):
+            pass
+
+    def clip(*args, **kwargs):
+        order.append("clip")
+
+    monkeypatch.setattr(torch.nn.utils, "clip_grad_norm_", clip)
+    optimizer = torch.optim.AdamW(tiny.model.parameters(), lr=tiny.lr)
+
+    class Scheduler:
+        def step(self):
+            pass
+
+    tiny._train_step([[0]], tiny._encode(TEXTS[:1]), [1], optimizer, Scheduler(), Scaler(), 0)
+    assert order.index("unscale") < order.index("clip") < order.index("step")
+
+
 def test_resume_matches_uninterrupted_run(tiny, tmp_path):
     from deberta import DebertaDetector
 

@@ -19,8 +19,8 @@ lists the tasks that remain.
 | Negative results documented honestly | **Partial** | Anti-goals and pass/fail rule fixed before training; `row1-s7267` FAILS (MCPTox AUROC 0.319); B0 below chance on holdouts | Not written up anywhere |
 | Reproducible via a single script | **Missing** | `make data` rebuilds the dataset; `make evaluate DETECTOR=...` runs one detector; `make b2-report` | No single entry point for all experiments; B2 training runs in Colab |
 | Config-driven (YAML) | **Partial** | `config.yaml` drives the data pipeline only | Detector and experiment settings are `argparse` defaults in `train.py` and `deberta_run.py` |
-| Version-controlled on GitHub | **Met** | PR workflow, DVC for data on R2, MLflow for runs | B2 score files are tracked in git under `report/deberta_scores/` (row 1, seeds 7267 and 7268) |
-| Unit-tested data and model components | **Mostly met** | 205 tests across data, metrics, harness, TF-IDF, perplexity, DeBERTa, verdict | New code (Optuna, CV, config loader) needs tests; three deferred minors |
+| Version-controlled on GitHub | **Met** | PR workflow, DVC for data on R2, MLflow for runs | B2 score files not yet tracked (`report/deberta_scores/` is untracked) |
+| Unit-tested data and model components | **Mostly met** | 205 tests across data, metrics, harness, TF-IDF, perplexity, DeBERTa, verdict | New code (Optuna, CV, config loader) needs tests; the three B2 minors are fixed (6.4) |
 | README with full setup instructions | **Partial** | Setup, data, DVC, B0 and MLflow sections | Status line is stale; no B1 or B2 sections, no Colab steps, no "reproduce everything" section |
 
 ## Required tasks
@@ -98,14 +98,14 @@ The key design choices already identified, and the run that tests each:
 - [ ] 6.1 Tests for the config loader: defaults, overrides, and an unknown key is an error.
 - [ ] 6.2 Tests for the Optuna objective on a tiny fixture: fixed seed gives the same best trial; the objective refuses holdout data.
 - [ ] 6.3 Tests for the fold assignment (planned in the famcv plan): twins stay together, no family spans two folds.
-- [ ] 6.4 Fix the three deferred B2 minors: catch NaN scores where they are produced, add gradient clipping, and check score-file labels at evaluate time. Add a test for each.
+- [x] 6.4 Fix the three deferred B2 minors: catch NaN scores where they are produced, add gradient clipping, and check score-file labels at evaluate time. Add a test for each.
 - [ ] 6.5 Run the full suite in CI on each PR (a GitHub Actions workflow running `uv run pytest`), if the team does not have one yet.
 
 ### 7. Write up negative results (negative results)
 
 Each of these is already known and must appear in the write-up, with numbers:
 
-- [ ] 7.1 **B2 row 1 fails the success criterion** on MCPTox: AUROC 0.319, TPR at 5% FPR 0.033 (CI 0.016–0.051) against B1's 0.2247. Test AUROC is 0.994, so the model fits the training surfaces but does not transfer. Report all seeds and rows, whatever the final verdict.
+- [ ] 7.1 **B2 row 1 fails the success criterion** on MCPTox: AUROC 0.319, TPR at 5% FPR 0.033 (CI 0.016–0.051) against B1's 0.2247. Test AUROC is 0.994, so the model fits the training surfaces but does not transfer. Report all seeds and rows, whatever the final verdict. Seed 7267 was trained before gradient clipping, so later seeds of that row are not bit-identical to it, and that is not a reason to retrain 7267.
 - [ ] 7.2 **Val saturation:** B2 reaches val AUROC 1.0 from epoch 1, so val cannot rank configurations. This is why the log-loss tie-break was added (amendment, 2026-11-08).
 - [ ] 7.3 **B0 perplexity is below chance on the holdouts** (MCPTox AUROC 0.43, MSB 0.13) and near chance in distribution (0.515).
 - [ ] 7.4 **MCPTox FPR is a genre gap**, not a threshold problem: train has no benign tool descriptions, so no threshold set on train_pool data reaches 1% FPR on MCPTox.
