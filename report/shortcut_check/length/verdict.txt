@@ -1,0 +1,9 @@
+FAIL
+test: AUROC CI-lower 0.462 does not beat best probe (all_cues, CI-upper 0.778) by the margin
+mcptox: AUROC CI-lower 0.661 does not beat best probe (length_only, CI-upper 0.874) by the margin
+mcptox: AUROC falls to 0.459 on length-matched rows
+msb: AUROC CI-lower 0.676 does not beat best probe (length_only, CI-upper 0.960) by the margin
+msb: only 26 rows could be length-matched (need 100); check not run
+test: AUROC moves 0.183 when benign rows are lengthened
+mcptox: AUROC moves 0.264 when benign rows are lengthened
+msb: AUROC moves 0.307 when benign rows are lengthened

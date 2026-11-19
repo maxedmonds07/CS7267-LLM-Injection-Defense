@@ -220,3 +220,6 @@ __marimo__/
 
 # macOS Finder metadata
 .DS_Store
+
+# Timestamped figure runs from notebooks/phase3_eda.py --run-folder
+notebooks/runs/

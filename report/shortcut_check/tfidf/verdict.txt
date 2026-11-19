@@ -1,0 +1,4 @@
+FAIL
+mcptox: AUROC CI-lower 0.615 does not beat best probe (length_only, CI-upper 0.874) by the margin
+msb: AUROC CI-lower 0.472 does not beat best probe (length_only, CI-upper 0.960) by the margin
+msb: only 26 rows could be length-matched (need 100); check not run
