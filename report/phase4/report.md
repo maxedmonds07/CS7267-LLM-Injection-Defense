@@ -44,28 +44,6 @@ link-citations: true
 reference-section-title: References
 ---
 
-<!--
-DRAFT STATUS (delete this block before submission)
-
-Numbers freeze 2026-11-30; write-up due 2026-12-07. Build: make report-phase4.
-Tables come from report/phase4/make_tables.py; after rerunning it, paste the changed tables
-from tables.md and run `make phase4-tables ARGS=--check`.
-
-Team decisions, marked TODO(team: ...) in the text:
-  1. Third trained family, or argue B0 counts (risk R1)            -> Model Families
-  2. B2 hyperparameter search: report the two-point sweep, or run
-     a small B2 Optuna study before Nov 30 (task 2.3)             -> Hyperparameter Search
-  3. B0: untuned reference, or search max_context/stride (2.4)    -> Hyperparameter Search
-  4. Score PR #40's red-team mutations with B1-Optuna and B2?      -> Robustness
-  5. Confirm B2's bar stays the original B1                        -> Results
-  6. Section owners (not in the text)
-
-Pending work, marked TODO(pending: ...):
-  - B1-famcv (tasks 3.1-3.2)                                        -> Cross-Validation, Ablation
-  - One config, make reproduce, DVC evaluation stages (5.1-5.5)     -> Setup, Appendix C
-Provisional: every number credited to PR #40 (changes requested; not merged).
--->
-
 \newpage
 \tableofcontents
 \newpage
@@ -152,11 +130,8 @@ backed by Neon PostgreSQL and object storage), with its parameters, all metrics 
 report as an artifact. Seeds are fixed throughout (7267 by default). `make evaluate`,
 `make b1-optuna` and `make b2-report` reproduce each step; DeBERTa training runs in a Colab
 notebook because it needs a GPU, and the rest of the pipeline consumes its score files.
-
-**TODO(pending: tasks 5.1–5.4).** One configuration file for every experiment, a single
-`make reproduce` entry point and DVC stages for evaluation are not built yet. Default wording if
-they land: "A fresh clone with R2 keys reproduces every table with `make install && make
-reproduce`; DeBERTa training is the one manual step."
+Appendix \ref{appendix-reproduce} lists the commands in order. Each step is reproduced by its
+own `make` target; there is no single end-to-end command or shared configuration file.
 
 On 2026-11-19 the shared MLflow database lost its compute endpoint at the end of the 55-minute
 Optuna study, and the run's upload failed. Because results are written to disk before they are
@@ -203,12 +178,10 @@ at norm 1.0, on a Colab T4 (about 18 minutes per run). The epoch is chosen by va
 A fourth row with synthetic tool descriptions was planned as a stretch goal and cut for Colab
 time.
 
-**TODO(team: risk R1, third trained family).** B0 is not trained on labels, so a reader may count
-two trained families (linear and transformer). Either add a third trained family through the same
-harness (for example gradient-boosted trees on TF-IDF and length features), or keep this
-paragraph. Default wording: "We count B0 as a family because it represents a distinct, label-free
-detection hypothesis (fluency), which the literature proposes as a defense; its failure is
-itself a result."
+B0 is not trained on our labels, so only B1 and B2 are trained families. We count B0 as a third
+family because it tests a distinct, label-free hypothesis that the literature proposes as a
+defense: that injected text is less fluent than benign text. Its failure is itself a result
+(§\ref{sec:results}).
 
 # Hyperparameter Search {#sec:search}
 
@@ -266,34 +239,32 @@ validation log-loss (0.048 vs 0.057). Validation saturates from the first epoch 
 configuration, which is why runs are compared by log-loss when their validation TPR ties
 (§\ref{sec:negative}).
 
-**TODO(team: task 2.3).** Either keep this subsection and call the B2 search limited, or run 6–10
-one-seed, validation-only Optuna trials over learning rate, epochs and pairwise weight before
-Nov 30 and report them here.
+This search is limited. Learning rate, epochs and batch size were kept at the recipe's values
+rather than searched. Since validation saturates, a wider search scored on validation could not
+have ranked the candidates in any case; a family-fold objective like B1-Optuna's would need a
+DeBERTa run per fold, which the Colab budget does not allow.
 
 ## B0
 
-**TODO(team: task 2.4).** Default wording: "B0 is an untuned reference. Its window and stride
-only change how perplexity is aggregated, and no setting can turn a fluency score into an
-injection score on surfaces where attacks are as fluent as benign text (§\ref{sec:results})."
+B0 is an untuned reference. Its window and stride only change how perplexity is aggregated, and
+no setting can turn a fluency score into an injection score on surfaces where attacks are as
+fluent as benign text (§\ref{sec:results}).
 
 # Cross-Validation and Uncertainty {#sec:cv}
 
 ## Family-grouped folds
 
-The folds used by B1-Optuna (and by B1-famcv, below) are built so that held-out AUROC means
+The folds used by B1-Optuna are built so that held-out AUROC means
 "attack families not seen in fitting". BIPIA's 25 attack families are assigned whole to five
 folds, largest first into the lightest fold; PoisonedRAG has a single attack family, so its
 groups are dealt round-robin. A group never spans two folds, so a BIPIA context and its attacked
 twin are always held out together. On the training split each fold holds 400–401 BIPIA pairs and
 215–220 PoisonedRAG attacks.
 
-## B1-famcv
-
-**TODO(pending: tasks 3.1–3.2).** B1-famcv chooses B1's `C` by mean AUROC over the same family
-folds instead of validation, and one variant also sets the threshold from out-of-fold benign
-scores (about 4,900 rows instead of 801). Report a per-fold table with the mean and a
-t-interval, and the decision under the famcv specification's rule. A null result (the same
-`C` as B1) is expected to be likely and is acceptable.
+These folds serve as B1-Optuna's search objective. We did not run B1 itself under family
+cross-validation (choosing its `C` on the folds instead of validation, or setting its threshold
+from about 4,900 out-of-fold benign scores instead of 801), so the uncertainty reported for the
+single-run detectors comes from bootstrap intervals on the fixed splits.
 
 ## Seed variance and intervals
 
@@ -389,23 +360,21 @@ bound above 0.5 but its TPR interval stays below B1's; the other two seeds fail 
 
 Table: B2 verdict on MCPTox for the selected configuration (row 2). A seed passes when both lower bounds clear their bars: B1's TPR at 5% FPR (0.2247) and 0.5. {#tbl:verdict}
 
-**TODO(team: confirm B2's bar).** B1-Optuna is stronger than the B1 that B2 was measured against.
-The criterion named the original B1 before B2 was trained, so the verdict keeps it; against
-B1-Optuna (0.274) B2 would fail by a wider margin. Default: keep this paragraph.
+B1-Optuna is stronger than the B1 that B2 was measured against. The criterion named the original
+B1 before B2 was trained, so the verdict keeps it; against B1-Optuna (0.274) B2 would fail by a
+wider margin.
 
 # Ablation Study {#sec:ablation}
 
 Table \ref{tbl:ablation} changes one design choice per row, with the same eval sets.
 
 | Design choice | Comparison | Test AUROC | MCPTox AUROC | MCPTox length-binned | MCPTox TPR at 5% FPR |
-|:------------------------------------|:-----------------------|-------------:|-------------:|-------------:|-------------:|
+|:------------------------------------|:----------------|-------------:|-------------:|-------------:|-------------:|
 | Pairwise loss on BIPIA twins | B2 row 1 → row 2 | 0.995 → 0.987 | 0.357 → 0.346 | 0.626 → 0.530 | 0.038 → 0.096 |
 | PoisonedRAG in training | B2 row 3 → row 2 | 0.936 → 0.987 | 0.199 → 0.346 | 0.300 → 0.530 | 0.024 → 0.096 |
 | Search space and family-CV objective | B1 → B1-Optuna | 0.902 → 0.922 | 0.675 → 0.767 | 0.685 → 0.725 | 0.225 → 0.274 |
-| Selection on val vs family CV | B1 → B1-famcv | pending | pending | pending | pending |
-| Threshold from val vs out-of-fold | B1-famcv → B1-famcv-oof | pending | pending | pending | pending |
 
-Table: Ablation: each row changes one design choice. B2 cells are means over 3 seeds; the B1-famcv rows wait on task 3.1. Word vs character features is in Table \ref{tbl:features}. {#tbl:ablation}
+Table: Ablation: each row changes one design choice. B2 cells are means over 3 seeds. Word vs character features is in Table \ref{tbl:features}. {#tbl:ablation}
 
 - **Pairwise loss.** It costs a little in distribution (0.995 to 0.987) and does not move MCPTox
   AUROC (0.357 to 0.346). Its gain in TPR at 5% FPR (0.038 to 0.096) comes almost entirely from
@@ -414,16 +383,16 @@ Table: Ablation: each row changes one design choice. B2 cells are means over 3 s
   The opposite holds: removing it makes B2 worse everywhere, including MCPTox (0.346 to 0.199
   AUROC). More varied training text helps more than a cleaner length signal.
 - **Search space and objective.** B1-Optuna improves every column. It changes the features, the
-  regularization and the selection objective at once; B1-famcv will separate the objective's
-  share.
-- **Selection and threshold source.** **TODO(pending: task 3.1)**, rows reserved in the table.
+  regularization and the selection objective at once, so this row does not say how much of the
+  gain comes from the family-fold objective alone. Separating it would take B1's original grid
+  selected on the family folds, which we did not run (§\ref{sec:cv}).
 
 # Robustness and Shortcut Analysis {#sec:robustness}
 
 Two checks built in Phase 3 ask whether a detector's score is real and whether it survives an
-attacker who rewrites the attack. Their numbers below come from PR #40, which is under review;
-**they are provisional** until it merges. Both use a 5% validation-FPR threshold, not the 1% used
-elsewhere in this report, so B1's original TPR here is 0.647 rather than 0.404.
+attacker who rewrites the attack. Both are run on B1, the detector they were built for, and use a
+5% validation-FPR threshold rather than the 1% used elsewhere in this report, so B1's original TPR
+here is 0.647 rather than 0.404.
 
 **Shortcut gate.** B1 passes in distribution: its AUROC lower bound (0.880) clears the best cue
 probe built from length, punctuation, capitalization and digit rates (upper bound 0.778), and it
@@ -431,17 +400,20 @@ keeps its signal when classes are balanced within length deciles (0.867). On MCP
 length probe's upper bound (0.874) is above B1's lower bound (0.615), although B1 keeps 0.712
 AUROC on the 222 length-matched rows, so it is not relying on length there. On MSB only 26 rows can
 be length-matched, too few to run the check. Label shuffling gives AUROC about 0.50 and there are
-no shared groups or duplicate texts between training and test (provisional, PR #40).
+no shared groups or duplicate texts between training and test.
 
 **Red-team mutations.** Rewriting every test-split attack eleven ways shows where B1 is brittle.
 Obfuscation that changes characters hurts most: TPR falls from 0.647 to 0.280 with leetspeak,
 0.328 with zero-width characters and 0.516 with homoglyphs. Wrapping attacks in JSON or Markdown
 costs about 0.04; synonyms, polite rewording, sentence shuffling, case noise, whitespace and HTML
-comments change almost nothing (provisional, PR #40). Character-level preprocessing (Unicode
-normalization, stripping zero-width characters) is a cheap fix for the largest losses.
+comments change almost nothing. Character-level preprocessing (Unicode normalization, stripping
+zero-width characters) is a cheap fix for the largest losses.
 
-**TODO(team: red-team scope).** Score the same mutations with B1-Optuna and B2 before Nov 30
-(B2 needs the mutation file scored on Colab), or report B1 only.
+We did not score the mutations with B1-Optuna or B2. B1-Optuna uses the same kind of word and
+character n-gram features as B1, so it is likely brittle in the same places, but we have not
+measured it. B2 would need the mutation file scored on Colab, and since B2 already fails to
+transfer to an unseen surface, its robustness to rewrites of in-distribution attacks would not
+change the conclusion.
 
 # Negative Results and Limitations {#sec:negative}
 
@@ -460,8 +432,11 @@ normalization, stripping zero-width characters) is a cheap fix for the largest l
   MCPTox; B1's benign MCPTox scores sit higher across the whole distribution.
 - **The holdouts are small.** MSB has 21 benign rows, and its tool-output slice has no benign rows
   at all, so it has no FPR or AUROC.
-- **The searches are limited.** B2's search is two points; the Optuna pruner never fired; and
-  B1-Optuna changes several things at once, so its gain is not attributed to one of them.
+- **The searches are limited.** B2's search is two points; B0 is not tuned; the Optuna pruner
+  never fired; and B1-Optuna changes several things at once, so its gain is not attributed to one
+  of them.
+- **The robustness checks cover B1 only.** The shortcut gate and the red-team mutations were not
+  run on B1-Optuna or B2.
 - **One run predates a code change.** B2 row 1, seed 7267, was trained before gradient clipping
   was added. By the run plan it was not retrained, so it is not bit-identical to its sibling
   seeds.
@@ -525,7 +500,8 @@ Table: AUROC by slice (B2: mean over seeds). Test-split slices pair each attack 
 
 # Reproducing the Results {#appendix-reproduce}
 
-**TODO(pending: task 5.3).** Until `make reproduce` exists:
+From a fresh clone with access to the DVC remote, these commands rebuild every number in this
+report, in order:
 
 ```bash
 make install && make data      # dependencies; data and score files (DVC)

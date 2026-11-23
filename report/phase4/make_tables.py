@@ -158,12 +158,9 @@ def ablation_table(single, b2):
         rows.append((choice, label, *[f"{b2_mean(base, e, c):.3f} → {b2_mean(variant, e, c):.3f}" for e, c in columns]))
     rows.append(("Search space and family-CV objective", "B1 → B1-Optuna",
                  *[f"{one('B1 TF-IDF', e, c):.3f} → {one('B1-Optuna', e, c):.3f}" for e, c in columns]))
-    rows.append(("Selection on val vs family CV", "B1 → B1-famcv", *["pending"] * 4))
-    rows.append(("Threshold from val vs out-of-fold", "B1-famcv → B1-famcv-oof", *["pending"] * 4))
     return table(["Design choice", "Comparison", "Test AUROC", "MCPTox AUROC", "MCPTox length-binned",
                   "MCPTox TPR at 5% FPR"], rows,
-                 "Ablation: each row changes one design choice. B2 cells are means over 3 seeds; the B1-famcv "
-                 "rows wait on task 3.1. "
+                 "Ablation: each row changes one design choice. B2 cells are means over 3 seeds. "
                  "Word vs character features is in Table \\ref{tbl:features}.", "tbl:ablation", text_columns=2)
 
 

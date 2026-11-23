@@ -55,14 +55,12 @@ Table: MSB (transfer, indicative): 21 benign, 70 adversarial. B2 rows (mean ± s
 Table: B2 verdict on MCPTox for the selected configuration (row 2). A seed passes when both lower bounds clear their bars: B1's TPR at 5% FPR (0.2247) and 0.5. {#tbl:verdict}
 
 | Design choice | Comparison | Test AUROC | MCPTox AUROC | MCPTox length-binned | MCPTox TPR at 5% FPR |
-|:------------------------------------|:-----------------------|-------------:|-------------:|-------------:|-------------:|
+|:------------------------------------|:----------------|-------------:|-------------:|-------------:|-------------:|
 | Pairwise loss on BIPIA twins | B2 row 1 → row 2 | 0.995 → 0.987 | 0.357 → 0.346 | 0.626 → 0.530 | 0.038 → 0.096 |
 | PoisonedRAG in training | B2 row 3 → row 2 | 0.936 → 0.987 | 0.199 → 0.346 | 0.300 → 0.530 | 0.024 → 0.096 |
 | Search space and family-CV objective | B1 → B1-Optuna | 0.902 → 0.922 | 0.675 → 0.767 | 0.685 → 0.725 | 0.225 → 0.274 |
-| Selection on val vs family CV | B1 → B1-famcv | pending | pending | pending | pending |
-| Threshold from val vs out-of-fold | B1-famcv → B1-famcv-oof | pending | pending | pending | pending |
 
-Table: Ablation: each row changes one design choice. B2 cells are means over 3 seeds; the B1-famcv rows wait on task 3.1. Word vs character features is in Table \ref{tbl:features}. {#tbl:ablation}
+Table: Ablation: each row changes one design choice. B2 cells are means over 3 seeds. Word vs character features is in Table \ref{tbl:features}. {#tbl:ablation}
 
 | Setting | Value | Trials | Best CV AUROC | Median CV AUROC |
 |:-------------|:-------|------:|------:|------:|
