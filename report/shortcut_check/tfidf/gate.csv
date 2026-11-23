@@ -1,0 +1,4 @@
+eval_set,detector_auroc,ci_lo,best_probe,probe_auroc_hi,beats_probe,length_matched_auroc,rows_matched,survives_length_match
+test,0.9015755325315893,0.8795960501677873,all_cues,0.7776804020232448,True,0.8673967754855603,818,True
+mcptox,0.6750128154012646,0.6145914283710522,length_only,0.8738386788055313,False,0.711549387225063,222,True
+msb,0.5374149659863946,0.47171982339034907,length_only,0.9604848996874416,False,,26,

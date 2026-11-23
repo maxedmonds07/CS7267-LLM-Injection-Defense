@@ -18,6 +18,8 @@ Figures land in ``notebooks/figures/``. The write-up is
 
 from __future__ import annotations
 
+import argparse
+import datetime as dt
 import subprocess
 import sys
 from pathlib import Path
@@ -39,6 +41,7 @@ from dataset import load  # noqa: E402
 FIG_DIR = ROOT / "notebooks" / "figures"
 WRITEUP = ROOT / "notebooks" / "PHASE3_VISUAL_DATA.pdf"
 _MARKDOWN = ROOT / "notebooks" / "PHASE3_VISUAL_DATA.md"
+MARKDOWN_ONLY = False  # --run-folder: keep the Markdown write-up, skip the pandoc PDF build
 
 BENIGN = "#4C78A8"
 ADVERSARIAL = "#E45756"
@@ -74,9 +77,9 @@ NUMERIC_LABELS = {
 }
 
 
-def load_frame() -> pd.DataFrame:
-    df = load("eval").to_pandas()
-    if len(df) != EXPECTED_ROWS:
+def load_frame(path=None, check_rows: bool = True) -> pd.DataFrame:
+    df = (load("eval", path=path) if path else load("eval")).to_pandas()
+    if check_rows and len(df) != EXPECTED_ROWS:
         raise SystemExit(
             f"expected {EXPECTED_ROWS} rows (the Phase 2 build); found {len(df)}. "
             "Refusing to draw figures from a different table."
@@ -367,7 +370,7 @@ def _md_table(headers: list[str], rows: list[list[object]]) -> str:
     return "\n".join([head, rule, *body])
 
 
-def write_report(df: pd.DataFrame, corr: dict, missing: pd.DataFrame, outliers: pd.DataFrame, medians: dict) -> None:
+def write_report(df: pd.DataFrame, corr: dict, missing: pd.DataFrame, outliers: pd.DataFrame, medians: dict, probe_md: str = "") -> None:
     n_adv = int(df["label"].sum())
     n_ben = int((df["label"] == 0).sum())
     by_source_rows = []
@@ -477,6 +480,11 @@ The pooled training set (`train_pool`, train split) is only BIPIA and PoisonedRA
 
 That is why a length-only model fit on the pooled training set looks useless in-distribution and then looks strong on MCPTox and MSB. The between-source effect teaches it that longer means adversarial. The held-out tool descriptions happen to match that direction, while PoisonedRAG, inside itself, runs the other way. Any detector score has to be compared with length inside each source. The numbers for that comparison are already in `DATA_CARD.md`, from `src/models/baselines.py`.
 """
+    if probe_md:
+        text = text.rstrip("\n") + "\n\n" + probe_md
+    if MARKDOWN_ONLY:
+        WRITEUP.write_text(text)
+        return
     _MARKDOWN.write_text(text)
     try:
         subprocess.run(
@@ -501,9 +509,18 @@ That is why a length-only model fit on the pooled training set looks useless in-
         _MARKDOWN.unlink(missing_ok=True)
 
 
-def main() -> None:
+def main(argv=None) -> None:
+    global FIG_DIR, WRITEUP, MARKDOWN_ONLY
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--run-folder", action="store_true",
+                    help="write figures and a Markdown write-up to notebooks/runs/<date_time>/ (no PDF build)")
+    ap.add_argument("--data", default=None, help="dataset.parquet to read (skips the 11,005-row check)")
+    args = ap.parse_args(argv)
+    if args.run_folder:
+        run_dir = ROOT / "notebooks" / "runs" / dt.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        FIG_DIR, WRITEUP, MARKDOWN_ONLY = run_dir / "figures", run_dir / "PHASE3_VISUAL_DATA.md", True
     _style()
-    df = load_frame()
+    df = load_frame(args.data, check_rows=args.data is None)
     plot_categorical(df)
     plot_numeric_distributions(df)
     corr = plot_correlation(df)
@@ -511,7 +528,11 @@ def main() -> None:
     outliers = plot_outliers(df)
     plot_target(df)
     medians = plot_insight(df)
-    write_report(df, corr, missing, outliers, medians)
+    from phase3_probe_figures import make_probe_figures
+
+    probe_md = make_probe_figures(df, _save)
+    WRITEUP.parent.mkdir(parents=True, exist_ok=True)
+    write_report(df, corr, missing, outliers, medians, probe_md)
     print(f"wrote figures to {FIG_DIR}")
     print(f"wrote {WRITEUP}")
 
