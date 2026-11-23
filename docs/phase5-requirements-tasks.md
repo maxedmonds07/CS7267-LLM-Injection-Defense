@@ -222,12 +222,12 @@ One mitigation per harm, each stating which result motivates it:
 
 ### 11. Report and housekeeping
 
-- [ ] 11.1 `report/phase5/` with `report.md`, `header.tex`, `ieee.csl`, `repo-links.lua` and
+- [x] 11.1 `report/phase5/` with `report.md`, `header.tex`, `ieee.csl`, `repo-links.lua` and
   `extra.bib` copied from `report/phase4/`, and a `make report-phase5` target. Sections map 1:1
   to the rubric's ten items.
 - [ ] 11.2 Add the new analyses as DVC stages (`fairness`, `latency`, `explain_tfidf`,
   `saliency`) so `dvc repro` regenerates `report/phase5/`.
-- [ ] 11.3 Add to `extra.bib`: Lundberg and Lee 2017 (SHAP), Ribeiro et al. 2016 (LIME),
+- [x] 11.3 Add to `extra.bib`: Lundberg and Lee 2017 (SHAP), Ribeiro et al. 2016 (LIME),
   Sundararajan et al. 2017 (integrated gradients), Mitchell et al. 2019 (model cards), Jain and
   Wallace 2019 (attention is not explanation).
 - [ ] 11.4 README: a "Phase 5 analyses" section with one command per task.
