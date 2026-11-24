@@ -77,6 +77,8 @@ Our contributions are:
   rates by group, latency and cost, six harms with a mitigation for each (one measured), and a
   model card (Appendix \ref{app:card}).
 
+Section \ref{sec:contrib} lists the method each team member developed.
+
 # Related Work {#sec:related}
 
 Our Phase 2 review coded 20 papers by attack surface, payload and defense class (its tables are
@@ -499,6 +501,22 @@ check, the model card and the drafts of this report were prepared with an AI ass
 working from committed result files and merged through reviewed pull requests with tests. Every
 number is produced by a committed script; analysis choices and the final text were reviewed by the
 team.
+
+# Team Contributions {#sec:contrib}
+
+Each team member designed and wrote the code for at least one method used in this paper
+(Table \ref{tbl:contrib}). Each contribution was made through a pull request (PR) to the public
+repository; the PR numbers below refer to it.
+
+| Member | Method developed and its code | Phase | Used in |
+|:------------------|:-----------------------------------------------------------|:------|:--------|
+| Mohammed Adil Ahmed | B0 perplexity and B1 TF-IDF detectors and MLflow experiment tracking (`src/models/perplexity.py`, `src/models/tfidf.py`, `mlflow-server/`; PRs #5, #22) | 3–4 | §§4–5 |
+| Carter Corbin | Length-shortcut gate, probe figures and the red-team mutation generator (`notebooks/phase3_probe_figures.py` and the red-team stage; PR #40) | 3 | §§3, 7 |
+| Max Edmonds | Visual profile of the unified corpus (`notebooks/phase3_eda.py`; PRs #20, #26); DeBERTa score guards and gradient clipping (`src/models/deberta.py`, `src/models/precomputed.py`; PR #39); the B2 training runs and verdict (PR #43) | 3–4 | §§3, 5 |
+| Oluwamayowa Adewummi | Family-grouped cross-validation of B1 with 95% intervals and length-binned AUROC (`src/eval/b1_tfidf_lr.py`; PR #46) | 4 | §4 |
+| Adedapo Odeyemi | Data pipeline (DVC stages, unified dataset build) and literature review; B2 DeBERTa model with chunked scoring and pairwise loss; B1-Optuna; Phase 5 SHAP, integrated gradients, error taxonomy and red-team scoring; reports (PRs #2, #7, #13, #30, #35, #45, #49) | 1–6 | §§2–7 |
+
+Table: The method each team member developed and coded, the project phases it belongs to, and the sections of this paper that use it. {#tbl:contrib}
 
 # References {-}
 
