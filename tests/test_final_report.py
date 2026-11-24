@@ -40,3 +40,10 @@ def test_check_reports_page_and_checklist_problems():
     problems = cfr.check_pages(pages, min_pages=8, max_pages=12, checklist_items=16)
     assert any("main text" in p for p in problems)
     assert any("checklist" in p for p in problems)
+
+
+def test_unresolved_citation_key_flagged():
+    # pandoc citeproc with ieee.csl renders a missing key as "key?"
+    assert cfr.placeholders("as shown in nosuchkey2020?.")
+    assert cfr.placeholders("see [greshake2023indirect?]")
+    assert not cfr.placeholders("Does B2 rank 2020? No.")

@@ -14,13 +14,13 @@ abstract: |
   never saw. We build an 11,005-row corpus from four public benchmarks, train a perplexity
   score, a TF-IDF logistic regression (tuned with a family-grouped Optuna search) and a
   fine-tuned DeBERTa-v3 on RAG passages and tool outputs, and hold out MCP tool descriptions
-  entirely. In distribution the detectors reach 0.92–0.99 AUROC; on MCP tool descriptions the
+  entirely. In distribution the trained detectors reach 0.90–0.99 AUROC; on MCP tool descriptions the
   best of them only ties text length (0.767 vs 0.774) and DeBERTa falls below chance (0.346).
   An error taxonomy, exact SHAP values and integrated gradients explain why: both trained models
   learned the *voice* of the training attacks, second-person phrasing about the model's
-  response ("in your response", "reply"), which appears in 44.5% of in-distribution attacks
-  but 2.7% of MCP attacks. Half of MCP attacks are instead written as tool procedure ("before
-  using X, you must first call Y"), a phrasing found in 1% of training-pool attacks. DeBERTa
+  response ("in your response", "reply"); the word *your* alone appears in 44.5% of
+  in-distribution test attacks but 2.7% of MCP attacks. Half of MCP attacks are instead written as tool procedure ("before
+  using X, you must first call Y"), a phrasing found in 1% of in-distribution test attacks. DeBERTa
   scores 98–100% of MCP tool descriptions below 0.01, so its below-chance AUROC is noise
   among near-zero scores, and it is also the most brittle model: leetspeak cuts its recall
   from 0.984 to 0.110. False alarms fall on long benign tool documentation (14.3% false-positive
@@ -55,7 +55,7 @@ success on o1-mini [@wang2026mcptox].
 
 A cheap defense is a detector that screens each untrusted segment before the model reads it.
 Detectors are usually evaluated on the same benchmarks they were trained on, where standard
-cross-validation overstates AUROC by 8–16 points relative to leave-one-dataset-out evaluation
+cross-validation overstates AUROC by 8.0–16.5 points relative to leave-one-dataset-out evaluation
 [@fomin2026benchmarks]. An attacker, however, chooses the surface. We therefore ask: **does a
 detector trained on RAG passages and tool outputs transfer to MCP tool descriptions, a surface
 it never saw, and if not, why not?**
@@ -67,8 +67,8 @@ Our contributions are:
   reference that every detector must beat.
 - **Three detector families** under one harness at a deployed 1% false-positive threshold
   (§\ref{sec:method}), including a TF-IDF model tuned on family-grouped folds and a fine-tuned
-  DeBERTa-v3 with a pre-registered success criterion. All fit their training surfaces; none
-  transfers (§\ref{sec:results}).
+  DeBERTa-v3 with a pre-registered success criterion. The trained detectors fit their training
+  surfaces; none transfers (§\ref{sec:results}).
 - **An explanation of the failure** (§\ref{sec:why}): a rule-based failure taxonomy, exact SHAP
   values and integrated gradients show that the trained detectors key on the second-person voice
   of the training attacks, while MCP attacks are written as tool procedure.
@@ -363,7 +363,7 @@ RAG passages (3.4% vs 1.6%). Only 25 MCPTox rows contain CJK text, too few to me
 | MCPTox | length Q4 | 91 | 255 | 0.143 [0.085, 0.229] | 0.435 | 0.007 |
 | MCPTox | CJK script | 23 | 2 | 0.000 [0.000, 0.143] | 0.000 | 0.000 |
 
-Table: Error rates by group at the deployed threshold (target FPR 1%). Length quartiles (Q1 shortest) use edges from each eval set's benign rows. B2: mean over three seeds; its recall is above 0.94 on every test group and at most 0.010 on MCPTox. {#tbl:fairness}
+Table: Error rates by group at the deployed threshold (target FPR 1%). Length quartiles (Q1 shortest) use edges from each eval set's benign rows. B2: mean over three seeds; its recall is at least 0.94 on the test groups shown and at most 0.011 on MCPTox. {#tbl:fairness}
 
 **Latency and cost** (Table \ref{tbl:cost}; Apple M4 Max laptop, 1,000 test rows, median of five passes). B1-Optuna
 scores a text in **0.58 ms** on one CPU core with 377,215 weights; B2 takes 56.2 ms on the same
@@ -437,9 +437,12 @@ team.
 # Reproducing the Results {#app:reproduce}
 
 Every number in this paper is produced by a committed script with a `make` target; the PDF is
-built by `make report-final`. Data and the B2 checkpoint are versioned with DVC; DeBERTa training
-runs in a Colab notebook (`notebooks/deberta_colab.ipynb`) because it needs a GPU, and the rest of the pipeline
-consumes its score files.
+built by `make report-final`. The rebuilt dataset, the B2 score files and the B2 checkpoint are
+versioned with DVC in a team-only remote, so `make data`, `make b2-report` and `make b2-checkpoint`
+need its credentials. Outside readers can rebuild the dataset with `dvc repro` from the pinned
+public upstream sources (NewsQA must first be built under its own terms), retrain B2 with the
+Colab notebook (`notebooks/deberta_colab.ipynb`), and re-check every table from the committed
+per-row scores of all detectors (`report/phase5/scores.parquet`).
 
 ```bash
 make install && make data      # dependencies (uv); dataset and B2 score files (DVC)

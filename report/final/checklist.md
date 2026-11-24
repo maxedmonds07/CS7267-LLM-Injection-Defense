@@ -32,7 +32,7 @@ reproducibility checklist. Section numbers refer to this paper.
 \item {\bf Open access to data and code}
     \item[] Question: Does the paper provide open access to the data and code, with sufficient instructions to faithfully reproduce the main experimental results, as described in supplemental material?
     \item[] Answer: \answerYes{}
-    \item[] Justification: All code, configuration, result files and the B2 training notebook are in the public repository (\url{https://github.com/maxedmonds07/CS7267-LLM-Injection-Defense}), with instructions in its README and Appendix~\ref{app:reproduce}. The dataset is not redistributed, because some upstream sources forbid it; the DVC pipeline rebuilds it from upstream repositories pinned to exact commits, and one input (NewsQA) must be built by the user under its own terms (Section~\ref{sec:data}).
+    \item[] Justification: The code, configuration, the B2 training notebook, the result tables and per-row scores of every detector are in the public repository (\url{https://github.com/maxedmonds07/CS7267-LLM-Injection-Defense}), with instructions in its README and Appendix~\ref{app:reproduce}. Access is partial in one respect: the rebuilt dataset, the B2 Colab score files and the B2 checkpoint sit in a team-only DVC remote, because some upstream sources forbid redistribution. Outside readers rebuild the dataset with the DVC pipeline from upstream repositories pinned to exact commits (NewsQA must be built under its own terms) and retrain B2 with the notebook (Section~\ref{sec:data}, Appendix~\ref{app:reproduce}).
 
 \item {\bf Experimental setting/details}
     \item[] Question: Does the paper specify all the training and test details (e.g., data splits, hyperparameters, how they were chosen, type of optimizer, etc.) necessary to understand the results?
@@ -62,7 +62,7 @@ reproducibility checklist. Section numbers refer to this paper.
 \item {\bf Safeguards}
     \item[] Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)?
     \item[] Answer: \answerYes{}
-    \item[] Justification: The rebuilt dataset, which collects working injection strings, stays in a private remote; the repository commits scores and row ids rather than text; red-team results are released as aggregates. The released detectors are small classifiers with a model card that states their out-of-scope uses (Section~\ref{sec:deploy}, Appendix~\ref{app:card}).
+    \item[] Justification: The rebuilt dataset, which collects working injection strings, stays in a private remote; the repository commits scores and row ids rather than text; red-team results are released as aggregates. Only the TF-IDF detectors can be refit from the public code alone; the B2 checkpoint stays team-only. The recommended detector has a model card that states its out-of-scope uses (Section~\ref{sec:deploy}, Appendix~\ref{app:card}).
 
 \item {\bf Licenses for existing assets}
     \item[] Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected?

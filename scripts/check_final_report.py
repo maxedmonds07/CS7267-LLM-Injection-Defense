@@ -15,7 +15,8 @@ from pathlib import Path
 REPO_URL = "github.com/maxedmonds07/CS7267-LLM-Injection-Defense"
 REFERENCES = re.compile(r"^\s*(\d+\s+)?References\s*$", re.MULTILINE)
 ANSWER = re.compile(r"\[(Yes|No|NA)\]")
-PLACEHOLDER = re.compile(r"\bTODO\b|\bTBD\b|\?\?|\(\?\)|@@")
+# Unresolved citations render as the bare key plus "?" (e.g. "zou2025poisonedrag?").
+PLACEHOLDER = re.compile(r"\bTODO\b|\bTBD\b|\?\?|\(\?\)|@@|\b[a-z]+\d{4}[a-z]*\?")
 
 
 def main_text_pages(pages: list[str]) -> int:
