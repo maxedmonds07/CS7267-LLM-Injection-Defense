@@ -38,6 +38,7 @@ bibliography:
   - ../phase2/extra.bib
   - ../phase4/extra.bib
   - ../phase5/extra.bib
+  - extra.bib
 csl: ieee.csl
 link-citations: true
 ---
@@ -78,32 +79,104 @@ Our contributions are:
 
 # Related Work {#sec:related}
 
-**Attacks by surface.** On the *RAG corpus*, PoisonedRAG reaches 90% attack success with five
-malicious passages per target question [@zou2025poisonedrag], and adversarial passages optimized
-against a dense retriever transfer across corpora [@zhong2023poisoning]. In *tool outputs*,
-BIPIA [@yi2025bipia], InjecAgent [@zhan2024injecagent] and AgentDojo
-[@debenedetti2024agentdojo] plant instructions in emails, web pages and documents. In *MCP tool
-descriptions*, MCPTox poisons tool metadata on 45 real servers [@wang2026mcptox], ToolHijacker
-crafts documents that win tool selection [@shi2026toolhijacker], and MSB covers every stage of
-the MCP pipeline [@zhang2026msb]. Liu et al. formalize the attack space and find that none of ten
-defenses suffices [@liu2024formalizing].
+Our Phase 2 review coded 20 papers by attack surface, payload and defense class (its tables are
+in the repository). For this report we extended it with a targeted search on injection detectors,
+MCP tool poisoning and shortcut learning. Table \ref{tbl:coverage} places the work by surface.
 
-**Defenses.** Model-level defenses retrain the LLM to ignore instructions in data, by structured
-instruction tuning [@chen2025struq], preference optimization [@chen2025secalign] or task-specific
-fine-tuning [@piet2024jatmo]. Prompt-level defenses mark untrusted input [@hines2024spotlighting].
-System-level defenses enforce control- and data-flow policies outside the model
-[@debenedetti2026camel] or certify RAG answers by isolate-then-aggregate
-[@xiang2026robustrag]. RAG-specific work detects poisoning from activations [@tan2025revprag] or
-traces it after the fact [@zhang2025traceback].
+## Attacks by surface {#sec:rw-attacks}
 
-**Detectors and their evaluation.** PromptShield fine-tunes a pretrained encoder and argues that
-detectors must be judged at very low false-positive rates [@jacob2025promptshield]. Fomin shows
-that injection classifiers learn dataset identity: 28–44% of their top features are dataset
-shortcuts [@fomin2026benchmarks]. Our structured review of 20 papers (Phase 2) found three gaps
-that this work addresses: no defense targets MCP tool descriptions, no detector classifies tool
-outputs, and no detector is tested on an attack *surface* held out of training. We follow
-Fomin's advice to report a length baseline and PromptShield's to report low-FPR operating
-points.
+Prompt injection was first shown in its *direct* form, where the user's own input overrides the
+developer's instructions [@perez2022ignore]. Greshake et al. showed the *indirect* form, in which
+the instruction arrives in data the application retrieves [@greshake2023indirect], and Liu et al.
+formalize the attack space and find that none of ten defenses suffices [@liu2024formalizing].
+Indirect attacks differ by the surface they enter through. On the *RAG corpus*, PoisonedRAG
+reaches 90% attack success with five malicious passages per target question
+[@zou2025poisonedrag], and adversarial passages optimized against a dense retriever transfer
+across corpora [@zhong2023poisoning]. In *tool outputs*, BIPIA [@yi2025bipia], InjecAgent
+[@zhan2024injecagent] and AgentDojo [@debenedetti2024agentdojo] plant instructions in the emails,
+tables, web pages and documents a tool returns. In *MCP tool descriptions*, the attack sits in
+metadata the agent reads when a server is registered: MCPTox poisons tools on 45 real servers
+[@wang2026mcptox], ToolHijacker crafts documents that win tool selection [@shi2026toolhijacker],
+MSB covers every stage of the MCP pipeline [@zhang2026msb], and MCP-ITP optimizes *implicit*
+poisoned descriptions that steer the agent to a different, legitimate tool while evading an
+LLM-based detector [@li2026mcpitp]. The goal is the same on every surface, but the text is not:
+a RAG attack is a short passage that answers a question wrongly, a tool-output attack addresses
+the model from inside a document, and a tool-description attack is written as part of the tool's
+own documentation (§\ref{sec:taxonomy}).
+
+## Defenses that change the model or the system {#sec:rw-defenses}
+
+Model-level defenses retrain the LLM to ignore instructions found in data: structured instruction
+tuning separates the prompt and data channels [@chen2025struq], preference optimization rewards
+following the intended instruction [@chen2025secalign], task-specific fine-tuning removes general
+instruction following [@piet2024jatmo], and an instruction hierarchy trains the model to rank
+privileged instructions above tool and user text [@wallace2024instruction]. Prompt-level defenses
+mark untrusted input so the model can tell it apart [@hines2024spotlighting]. System-level
+defenses enforce control- and data-flow policies outside the model [@debenedetti2026camel] or
+certify RAG answers by isolate-then-aggregate [@xiang2026robustrag], and RAG forensics traces a
+poisoned answer back to the passages that caused it [@zhang2025traceback]. Each of these needs
+access to the model's weights, its prompt or the agent's architecture. A detector needs none: it
+screens each untrusted segment before the model reads it, which is why it is often the first
+defense a deployment adds, and why its failure modes matter.
+
+## Injection detectors {#sec:rw-detectors}
+
+Detectors fall into four families. *Fluency filters* flag text with high perplexity under a
+language model. They catch the gibberish adversarial suffixes found by gradient search
+[@zou2023universal] but not human-written attacks, whose perplexity resembles ordinary text
+[@alon2023perplexity; @jain2023baseline]; our B0 tests whether the idea carries over to indirect
+injection. *Fine-tuned classifiers* train an encoder on labeled injections. PromptShield
+fine-tunes a pretrained encoder and argues that detectors must be judged at very low
+false-positive rates [@jacob2025promptshield], and InjecGuard shows that such guardrails
+*over-defend*, flagging benign text that contains trigger words common in attacks
+[@li2024injecguard], the failure we observe on benign tool documentation (§\ref{sec:shap}). Our
+B1 and B2 belong to this family. *LLM-based detectors* use a language model as the judge;
+DataSentinel fine-tunes one in a minimax game against adaptive attacks [@liu2025datasentinel].
+*Internal-signal detectors* read the protected model's own state: Attention Tracker flags inputs
+that pull specific attention heads away from the original instruction [@hung2025attention], and
+RevPRAG detects RAG poisoning from activations [@tan2025revprag]. The last family needs
+white-box access to the protected LLM, and the third an LLM call per segment. We study the first
+two, which are cheap enough to run on every segment and independent of the model they protect.
+
+## Evaluation under distribution shift {#sec:rw-shift}
+
+Classifiers often learn *shortcuts*: features that predict the label in the training distribution
+but are not the intended concept [@geirhos2020shortcut]. Models trained on natural-language
+inference data learn annotation artifacts such as negation words [@gururangan2018annotation] and
+syntactic heuristics such as word overlap [@mccoy2019right], and score well until a test set
+breaks the artifact. Domain-generalization work therefore holds out whole domains at test time
+[@gulrajani2021search; @koh2021wilds]. Injection detection has only recently adopted this
+practice. Fomin shows that injection classifiers learn dataset identity, with 28–44% of their top
+features being dataset shortcuts, and that leave-one-dataset-out testing lowers AUROC
+[@fomin2026benchmarks]. Concurrently with our work, Liu replays benign tool calls from two agent
+benchmarks, finds that detector rankings on BIPIA do not carry over to agent tool outputs, and
+attributes the gap to the form of the training inputs [@liu2026passing]. Both hold out
+*datasets*; neither holds out a *surface*, and neither traces the failure to the features the
+detector uses.
+
+| Surface | Attacks and benchmarks | Detector evaluations | Held out of training |
+|:----------------|:--------------------------|:----------------------------------|:--------------------|
+| RAG corpus | [@zou2025poisonedrag; @zhong2023poisoning] | activations, white-box [@tan2025revprag] | no |
+| Tool output | [@yi2025bipia; @zhan2024injecagent; @debenedetti2024agentdojo] | general classifiers [@jacob2025promptshield; @fomin2026benchmarks; @liu2026passing] | datasets [@fomin2026benchmarks; @liu2026passing] |
+| MCP tool description | [@wang2026mcptox; @shi2026toolhijacker; @zhang2026msb; @li2026mcpitp] | a detector as the target of evasion [@li2026mcpitp] | whole surface (this work) |
+
+Table: Prior work by the surface an attack enters through. *Held out of training*: whether a detector is tested on data excluded from its training, and at what level. From our 20-paper review and a targeted search. {#tbl:coverage}
+
+## The research gap {#sec:rw-gap}
+
+Three gaps follow, and each maps to a contribution. *(1) No detector has been tested on MCP tool
+descriptions held out of training.* MCP attacks are benchmarked [@wang2026mcptox; @zhang2026msb],
+and in the work we found a detector appears on this surface mainly as something an attack is
+optimized to evade [@li2026mcpitp]. We hold the surface out whole and report every detector next
+to a length baseline (§§\ref{sec:data}–\ref{sec:results}). *(2) Transfer has been measured across
+datasets, not surfaces.* Leave-one-dataset-out testing [@fomin2026benchmarks] and cross-benchmark
+replay [@liu2026passing] score new data from a familiar surface; we score a surface whose attacks
+are written differently. *(3) The failure has not been explained by the features a detector
+uses.* Shortcut learning predicts that detectors key on incidental cues [@geirhos2020shortcut],
+and over-defense shows that trigger words cause false alarms [@li2024injecguard]. We name the cue
+for both a linear and a transformer detector with exact SHAP values and integrated gradients, and
+measure how often it appears on each surface (§\ref{sec:why}). Throughout, we follow Fomin's
+advice to report a length baseline and PromptShield's to report low-FPR operating points.
 
 # Data {#sec:data}
 
