@@ -139,7 +139,7 @@ FINAL_DIR := report/final
 
 report-final: ## Build the final NeurIPS-format report PDF with pandoc and tectonic
 	cd $(FINAL_DIR) && tail -n +2 ../../MODEL_CARD.md | pandoc -f markdown+lists_without_preceding_blankline \
-		report.md - checklist.md --citeproc --lua-filter=repo-links.lua --pdf-engine=tectonic \
+		report.md - checklist.md --columns=125 --citeproc --lua-filter=repo-links.lua --lua-filter=float-tables.lua --pdf-engine=tectonic \
 		-H header.tex -o report.pdf
 	@echo "Wrote $(FINAL_DIR)/report.pdf"
 
