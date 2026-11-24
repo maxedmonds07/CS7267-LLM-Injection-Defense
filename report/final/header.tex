@@ -1,0 +1,19 @@
+% Preamble for the final report (pandoc -H header.tex): the official NeurIPS 2025 style in
+% preprint mode (author names shown, no line numbers), with the footer notice replaced so the
+% paper does not present itself as a NeurIPS submission or publication.
+\usepackage[preprint,nonatbib]{neurips_2025}
+\makeatletter
+\renewcommand{\@noticestring}{CS 7267 Machine Learning, Kennesaw State University. Final project report, December 2026.}
+\makeatother
+
+
+\usepackage{microtype}
+\usepackage{etoolbox}
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, skip=4pt}
+\captionsetup[table]{position=above}
+\AtBeginEnvironment{longtable}{\small\renewcommand{\arraystretch}{1.1}}
+\usepackage{float}
+\floatplacement{figure}{tbp}
+\setlength{\LTpre}{4pt}
+\setlength{\LTpost}{4pt}

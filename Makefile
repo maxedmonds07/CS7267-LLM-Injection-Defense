@@ -19,7 +19,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 report-phase5 phase5 phase5-scores phase5-fairness phase5-errors phase5-shap phase5-saliency phase5-latency red-team-b2 b2-checkpoint eda-report evaluate shortcut-check red-team red-team-data b1-optuna b2-report
+.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 report-phase5 phase5 phase5-scores phase5-fairness phase5-errors phase5-shap phase5-saliency phase5-latency red-team-b2 b2-checkpoint report-final check-final eda-report evaluate shortcut-check red-team red-team-data b1-optuna b2-report
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -134,6 +134,17 @@ report-phase5: ## Build the Phase 5 report PDF with pandoc and tectonic
 	cd $(PHASE5_DIR) && tail -n +2 ../../MODEL_CARD.md | pandoc -f markdown+lists_without_preceding_blankline report.md - --citeproc \
 		--lua-filter=repo-links.lua --pdf-engine=tectonic -H header.tex -o report.pdf
 	@echo "Wrote $(PHASE5_DIR)/report.pdf"
+
+FINAL_DIR := report/final
+
+report-final: ## Build the final NeurIPS-format report PDF with pandoc and tectonic
+	cd $(FINAL_DIR) && tail -n +2 ../../MODEL_CARD.md | pandoc -f markdown+lists_without_preceding_blankline \
+		report.md - checklist.md --citeproc --lua-filter=repo-links.lua --pdf-engine=tectonic \
+		-H header.tex -o report.pdf
+	@echo "Wrote $(FINAL_DIR)/report.pdf"
+
+check-final: ## Check the final report PDF against the rubric (pages, checklist, placeholders, repo link)
+	uv run python scripts/check_final_report.py $(FINAL_DIR)/report.pdf
 
 EDA_DIR := report/phase3
 
