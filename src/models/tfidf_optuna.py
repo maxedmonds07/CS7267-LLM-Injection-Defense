@@ -31,6 +31,7 @@ SAMPLER_SEED = 7267
 FOLDS = 5
 FOLD_SEED = 7267
 CHAR_RANGES = {"2-4": (2, 4), "3-5": (3, 5), "3-6": (3, 6)}
+BEST_PARAMS_PATH = Path(__file__).resolve().parents[2] / "report/phase4/b1_optuna/best_params.json"
 
 
 class TunedTfidfDetector(TfidfDetector):

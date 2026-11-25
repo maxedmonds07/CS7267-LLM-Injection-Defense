@@ -1,0 +1,97 @@
+feature,shap,detector,id,error
+word__in your,3.1181787975233135,b1,mcptox:Github:clean:create_repository,false_positive
+word__your,2.602576995850973,b1,mcptox:Github:clean:create_repository,false_positive
+word__account,-0.4743675825399496,b1,mcptox:Github:clean:create_repository,false_positive
+char__your ,0.3769621378774996,b1,mcptox:Github:clean:create_repository,false_positive
+char__ your,0.3763166172584356,b1,mcptox:Github:clean:create_repository,false_positive
+char__your,0.3701120096967929,b1,mcptox:Github:clean:create_repository,false_positive
+word__tool,0.25540914933051445,b1,mcptox:Github:clean:create_repository,false_positive
+word__description,-0.2328924203800625,b1,mcptox:Github:clean:create_repository,false_positive
+word__reply,1.8227674890645291,b1,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__reply,0.6416994467736225,b1,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__eply,0.599337700208723,b1,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__repl,0.5851773947260377,b1,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__epl,0.5314895965348628,b1,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__ply,0.4264358687386534,b1,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+word__message,0.38290784544707945,b1,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__ repl,0.3440118523743546,b1,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+word__in your,1.2126584815245045,b1,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__your,0.99148370700707,b1,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__provide,0.6988604197237563,b1,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__provide the,0.35650667348501697,b1,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__of the,-0.33830997490204767,b1,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__users,0.29997042794212736,b1,mcptox:Prisma:clean:Prisma-Studio,false_positive
+char__your ,0.2641187785003508,b1,mcptox:Prisma:clean:Prisma-Studio,false_positive
+char__ your,0.2636664940392005,b1,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__to,-0.36649784471292907,b1,mcptox:Email_16,false_negative
+word__and,-0.35362523294880177,b1,mcptox:Email_16,false_negative
+word__tool,0.16427588927471845,b1,mcptox:Email_16,false_negative
+word__description,-0.14985257481068712,b1,mcptox:Email_16,false_negative
+word__will,-0.10812999348811089,b1,mcptox:Email_16,false_negative
+word__system,-0.10175308816362763,b1,mcptox:Email_16,false_negative
+word__of,0.10106722590932184,b1,mcptox:Email_16,false_negative
+word__with,-0.08637507861370695,b1,mcptox:Email_16,false_negative
+word__you,-0.18105457457207638,b1,mcptox:Apify_8,false_negative
+word__to,-0.17015015977252423,b1,mcptox:Apify_8,false_negative
+word__and,0.1395595527752164,b1,mcptox:Apify_8,false_negative
+word__name,-0.1295206591916449,b1,mcptox:Apify_8,false_negative
+word__all,-0.10991281238984947,b1,mcptox:Apify_8,false_negative
+word__email,-0.10158679834557534,b1,mcptox:Apify_8,false_negative
+word__of,0.10106722590932184,b1,mcptox:Apify_8,false_negative
+word__parameter,-0.09862050327060508,b1,mcptox:Apify_8,false_negative
+word__you,-0.27239459653169235,b1,mcptox:ClickHouse_15,false_negative
+word__and,0.1395595527752164,b1,mcptox:ClickHouse_15,false_negative
+word__to,-0.13797587229205116,b1,mcptox:ClickHouse_15,false_negative
+word__do,0.13780683581209838,b1,mcptox:ClickHouse_15,false_negative
+word__tool,0.13505871322047264,b1,mcptox:ClickHouse_15,false_negative
+word__from,-0.13015222652953298,b1,mcptox:ClickHouse_15,false_negative
+word__description,-0.1232301343753027,b1,mcptox:ClickHouse_15,false_negative
+word__no,-0.11396464538444893,b1,mcptox:ClickHouse_15,false_negative
+word__in your,2.4125481311992685,b1_optuna,mcptox:Github:clean:create_repository,false_positive
+word__your,2.2541710199807237,b1_optuna,mcptox:Github:clean:create_repository,false_positive
+word__account,-0.3326527078602369,b1_optuna,mcptox:Github:clean:create_repository,false_positive
+char__in y,0.32005972704355323,b1_optuna,mcptox:Github:clean:create_repository,false_positive
+char__your,0.3004233354987037,b1_optuna,mcptox:Github:clean:create_repository,false_positive
+char__n yo,0.26748693497536535,b1_optuna,mcptox:Github:clean:create_repository,false_positive
+char__n y,0.24037780748868445,b1_optuna,mcptox:Github:clean:create_repository,false_positive
+char__ur a,0.21534991465153766,b1_optuna,mcptox:Github:clean:create_repository,false_positive
+word__in your,0.8692309527699759,b1_optuna,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__your,0.792694439951448,b1_optuna,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__provide,0.5506930749115693,b1_optuna,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__provide the,0.26888397318750457,b1_optuna,mcptox:Prisma:clean:Prisma-Studio,false_positive
+char__in y,0.2330856355963031,b1_optuna,mcptox:Prisma:clean:Prisma-Studio,false_positive
+char__your,0.21597775972951908,b1_optuna,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__users,0.20467481052203096,b1_optuna,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__of the,-0.20131675153763037,b1_optuna,mcptox:Prisma:clean:Prisma-Studio,false_positive
+word__reply,1.4550553643899695,b1_optuna,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__eply,0.45455040471629726,b1_optuna,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__repl,0.44217276602176425,b1_optuna,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__epl,0.4036893753144247,b1_optuna,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+word__message,0.33842674236569376,b1_optuna,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__ply,0.3245078803680477,b1_optuna,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+char__ply ,0.16419843229596828,b1_optuna,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+word__to,-0.1582115175720212,b1_optuna,mcptox:Slack:clean:slack_reply_to_thread,false_positive
+word__you,-0.1408288707676056,b1_optuna,mcptox:BaiduMap_10,false_negative
+word__and,0.11419896999527147,b1_optuna,mcptox:BaiduMap_10,false_negative
+word__of the,-0.11296364892642251,b1_optuna,mcptox:BaiduMap_10,false_negative
+char__ you,0.08670206778145834,b1_optuna,mcptox:BaiduMap_10,false_negative
+char__you,0.08182855003261963,b1_optuna,mcptox:BaiduMap_10,false_negative
+word__tool,0.07982857828844249,b1_optuna,mcptox:BaiduMap_10,false_negative
+word__an,0.07651819502677439,b1_optuna,mcptox:BaiduMap_10,false_negative
+word__road,-0.07366819487560568,b1_optuna,mcptox:BaiduMap_10,false_negative
+word__and,-0.32256012133599987,b1_optuna,mcptox:Email_16,false_negative
+word__to,-0.2874980062254036,b1_optuna,mcptox:Email_16,false_negative
+char__ ',0.1907872311056509,b1_optuna,mcptox:Email_16,false_negative
+word__tool,0.14252614060304758,b1_optuna,mcptox:Email_16,false_negative
+word__description,-0.10905720344955394,b1_optuna,mcptox:Email_16,false_negative
+word__will,-0.10673998797864544,b1_optuna,mcptox:Email_16,false_negative
+word__of,0.06869892870345154,b1_optuna,mcptox:Email_16,false_negative
+char__' ,0.06773219225402552,b1_optuna,mcptox:Email_16,false_negative
+word__you,-0.15948397817923946,b1_optuna,mcptox:ClickHouse_22,false_negative
+word__are,-0.12544100274825618,b1_optuna,mcptox:ClickHouse_22,false_negative
+word__and,0.11419896999527147,b1_optuna,mcptox:ClickHouse_22,false_negative
+word__tool,0.08979316509128159,b1_optuna,mcptox:ClickHouse_22,false_negative
+word__from,-0.0789934706542504,b1_optuna,mcptox:ClickHouse_22,false_negative
+word__if,-0.07845151550246222,b1_optuna,mcptox:ClickHouse_22,false_negative
+word__no,-0.07603340153199917,b1_optuna,mcptox:ClickHouse_22,false_negative
+word__must,-0.07446037708717873,b1_optuna,mcptox:ClickHouse_22,false_negative

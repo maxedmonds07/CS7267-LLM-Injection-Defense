@@ -9,6 +9,7 @@ server running) to log; otherwise the report is printed and not logged.
 
 import argparse
 import hashlib
+import json
 import math
 import os
 from pathlib import Path
@@ -50,6 +51,11 @@ def fit_detector(name, data, *, ppl_model="distilbert/distilgpt2", ppl_max_conte
         return model, {
             "model_name": ppl_model, "max_context": ppl_max_context, "stride": ppl_stride,
         }
+    if name == "tfidf-optuna":
+        # B1-Optuna's committed best settings, refit on train; the study itself is not rerun.
+        from tfidf_optuna import BEST_PARAMS_PATH, fit_best
+        best = json.loads(Path(BEST_PARAMS_PATH).read_text())
+        return fit_best(best["params"], data), dict(best["params"])
     if name != "tfidf":
         raise ValueError(f"Unknown detector: {name}")
     fitted = [TfidfDetector(C=c).fit(data.train.text, data.train.label) for c in TFIDF_C_GRID]

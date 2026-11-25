@@ -37,6 +37,10 @@ mlflow-server = [
     "psycopg[binary]>=3.3.6",
     "python-dotenv>=1.2.3",
 ]
+explain = [
+    "captum>=0.9.0",
+    "shap>=0.51.0",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src/data", "src/models", "src/eval"]

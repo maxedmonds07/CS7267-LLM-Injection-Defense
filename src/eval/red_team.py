@@ -296,7 +296,7 @@ def run(detector_name, data_path=DEFAULT_PATH, out_dir=DEFAULT_OUT, names=None, 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--detector", choices=["length", "tfidf", "perplexity"],
+    ap.add_argument("--detector", choices=["length", "tfidf", "tfidf-optuna", "perplexity"],
                     help="fit and evaluate this detector (omit with --write-only)")
     ap.add_argument("--data", default=str(DEFAULT_PATH))
     ap.add_argument("--out", default=str(DEFAULT_OUT))
