@@ -1,7 +1,7 @@
 # Presentation outline: Detectors Learn a Voice, Not a Behavior
 
 Outline of the final presentation deck (a Claude Slides artifact; ask the team for the link).
-About 13 minutes plus Q&A: 15 main slides and 3 backup slides. Each person presents the slides
+About 13.5 minutes plus Q&A: 16 main slides and 3 backup slides. Each person presents the slides
 that use the method they built (paper §9). Every number comes from `report/final/report.md`;
 figure paths are relative to the repo root.
 
@@ -16,16 +16,17 @@ figure paths are relative to the repo root.
 | 7 | Fit in distribution, fail off surface (AUROC figure) | Oluwamayowa Adewummi | 1:00 |
 | 8 | On MCP tool descriptions, the order reverses (results table) | Max Edmonds | 1:00 |
 | 9 | MCP attacks are written as tool procedure | Adedapo Odeyemi | 1:00 |
-| 10 | SHAP: the TF-IDF model learned a voice | Adedapo Odeyemi | 1:15 |
-| 11 | Saliency: DeBERTa does not respond to the surface | Adedapo Odeyemi | 1:00 |
-| 12 | Deployment: brittle, noisy on long docs, and costly | Carter Corbin | 1:15 |
-| 13 | Harms and mitigations | Mohammed Adil Ahmed | 0:45 |
-| 14 | Team contributions: who built what | Oluwamayowa Adewummi | 0:30 |
-| 15 | Conclusion | Mohammed Adil Ahmed | 0:45 |
-| 16–18 | Backup: limitations, per-seed verdict, local SHAP | anyone | — |
+| 10 | SHAP: the TF-IDF model learned a voice | Adedapo Odeyemi | 1:00 |
+| 11 | Saliency: DeBERTa does not respond to the surface | Adedapo Odeyemi | 0:50 |
+| 12 | Reading the task does not help (B4) | Mohammed Adil Ahmed | 0:40 |
+| 13 | Deployment: brittle, noisy on long docs, and costly | Carter Corbin | 1:15 |
+| 14 | Harms and mitigations | Mohammed Adil Ahmed | 0:45 |
+| 15 | Team contributions: who built what | Oluwamayowa Adewummi | 0:30 |
+| 16 | Conclusion | Mohammed Adil Ahmed | 0:45 |
+| 17–19 | Backup: limitations, per-seed verdict, local SHAP | anyone | — |
 
-Time per speaker: Max Edmonds 3:20, Adedapo Odeyemi 3:55, Carter Corbin 2:00, Mohammed Adil
-Ahmed 2:05, Oluwamayowa Adewummi 1:55.
+Time per speaker: Max Edmonds 3:20, Adedapo Odeyemi 3:30, Carter Corbin 2:00, Mohammed Adil
+Ahmed 2:45, Oluwamayowa Adewummi 1:55.
 
 ---
 
@@ -58,9 +59,10 @@ Ahmed 2:05, Oluwamayowa Adewummi 1:55.
 - Length-only AUROC: 0.491 in distribution, **0.774 on MCPTox**, 0.866 on MSB.
 - Length flips direction between sources; every detector is reported next to it.
 
-## 6. Detectors — Mohammed Adil Ahmed (B0, B1), then Oluwamayowa Adewummi (family-grouped CV)
+## 6. Detectors — Mohammed Adil Ahmed (B0, B1, B4), then Oluwamayowa Adewummi (family-grouped CV)
 
-- B0 perplexity (frozen DistilGPT2); B1 TF-IDF + logistic regression; B1-Optuna; B2 DeBERTa-v3.
+- B0 perplexity (frozen DistilGPT2); B1 TF-IDF + logistic regression; B1-Optuna; B2 DeBERTa-v3;
+  B4, DeBERTa that also reads the user's task (slide 12).
 - Family-grouped folds hold out each attack family whole.
 - Threshold at 1% FPR on validation; group-bootstrap AUROC intervals; Wilson FPR intervals.
 
@@ -92,29 +94,39 @@ Ahmed 2:05, Oluwamayowa Adewummi 1:55.
 - Same voice on test attacks; MCP attacks and benign rows share a median logit of −8.61;
   98–100% of MCP rows score below 0.01.
 
-## 12. Deployment — Carter Corbin (red-team mutation generator)
+## 12. Reading the task does not help (B4) — Mohammed Adil Ahmed
+
+- B4 pairs each text with the user's task (the question, or the MCP server's task catalogue);
+  four configurations, three seeds each, on the 672 MCPTox and 76 MSB rows that have a task.
+- Adding the task lifts MCPTox AUROC from 0.339 to 0.506, about chance; TPR at 5% FPR stays
+  below 0.05. Lexical relevance features lower it to 0.454. Length alone: 0.760 on these rows.
+- Takeaway: context makes DeBERTa less wrong, not a detector; the gap is still the data.
+
+## 13. Deployment — Carter Corbin (red-team mutation generator)
 
 - Leetspeak cuts DeBERTa recall from 0.984 to 0.110; 14.3% FPR on the longest benign tool docs;
   B1-Optuna about 100× cheaper (0.58 vs 56.2 ms per row).
 
-## 13. Harms and mitigations — Mohammed Adil Ahmed
+## 14. Harms and mitigations — Mohammed Adil Ahmed
 
 - Four of the paper's six harms, each with evidence and a mitigation.
 - Measured: NFKC plus zero-width stripping repairs zero-width attacks (0.483 → 0.725), not
   homoglyphs (0.614) or leetspeak (0.213).
 
-## 14. Team contributions — Oluwamayowa Adewummi
+## 15. Team contributions — Oluwamayowa Adewummi
 
 - Table of the method each member developed and coded, with phases; paper §9 has the files and PRs.
 
-## 15. Conclusion — Mohammed Adil Ahmed
+## 16. Conclusion — Mohammed Adil Ahmed
 
-- Detectors learned a voice, not a behavior; more capacity made it worse.
+- Detectors learned a voice, not a behavior; more capacity made it worse, and reading the
+  user's task did not fix it.
 - Deploy B1-Optuna only with guardrails; next step is data, not a bigger model.
 
 ## Backup slides
 
 - **Limitations:** small holdouts; B2 seed variance (0.247–0.491) and single-seed analyses;
-  frozen detectors; detection, not end-to-end attack success.
+  frozen detectors; B4 uses server task catalogues, not observed requests, and fewer holdout
+  rows; detection, not end-to-end attack success.
 - **Per-seed verdict:** TPR at 5% FPR 0.208 / 0.039 / 0.041 against B1's 0.225.
 - **Local SHAP:** `report/phase5/shap/b1_optuna_local.png`.
