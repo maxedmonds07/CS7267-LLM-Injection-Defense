@@ -19,7 +19,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 eda-report evaluate shortcut-check red-team red-team-data b1-optuna b2-report
+.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 report-phase5 eda-report evaluate shortcut-check red-team red-team-data b1-optuna b2-report
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -127,6 +127,13 @@ report-phase4: ## Build the Phase 4 report PDF with pandoc and tectonic
 	cd $(PHASE4_DIR) && pandoc -f markdown+lists_without_preceding_blankline report.md --citeproc \
 		--lua-filter=repo-links.lua --pdf-engine=tectonic -H header.tex -o report.pdf
 	@echo "Wrote $(PHASE4_DIR)/report.pdf"
+
+PHASE5_DIR := report/phase5
+
+report-phase5: ## Build the Phase 5 report PDF with pandoc and tectonic
+	cd $(PHASE5_DIR) && pandoc -f markdown+lists_without_preceding_blankline report.md --citeproc \
+		--lua-filter=repo-links.lua --pdf-engine=tectonic -H header.tex -o report.pdf
+	@echo "Wrote $(PHASE5_DIR)/report.pdf"
 
 EDA_DIR := report/phase3
 
