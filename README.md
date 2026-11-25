@@ -200,6 +200,38 @@ uv run --group perplexity python src/models/train.py --detector perplexity
 This is a standard causal-LM perplexity detector, not an exact reproduction of the
 PoisonedRAG paper's `cl100k_base`-based scoring procedure.
 
+## Phase 5 analyses
+
+Phase 5 evaluates and explains the frozen detectors; nothing is retrained. Results go to
+`report/phase5/` and `report/red_team/`, the write-up is `report/phase5/report.pdf`, and the
+recommended detector is documented in [MODEL_CARD.md](MODEL_CARD.md).
+
+| Command | What it produces |
+|---|---|
+| `make b2-checkpoint` | Pulls and unpacks the B2 row2-s7267 checkpoint (needed by the B2 targets below) |
+| `make phase5-scores` | One score per row and detector, plus deployed thresholds (`scores.parquet`, `thresholds.json`) |
+| `make phase5-fairness` | AUROC, TPR and FPR (Wilson interval) by source, surface, attack kind, length and script |
+| `make phase5-errors` | Rule-based failure-mode taxonomy and cue rates (`errors/`) |
+| `make red-team DETECTOR=tfidf-optuna` / `make red-team-b2` | Eleven rewrites of each test attack, scored by B1-Optuna / B2 |
+| `make phase5-shap` | Exact SHAP attributions for B1 and B1-Optuna (`shap/`) |
+| `make phase5-saliency` | Integrated-gradients saliency for B2 (`saliency/`) |
+| `make phase5-latency` | Inference latency, size and fit time on this machine (`latency.csv`) |
+| `make report-phase5` | The Phase 5 report PDF |
+
+`make phase5` runs every analysis. SHAP and saliency need the `explain` dependency group,
+which the targets select.
+
+## Final report
+
+The final paper, `report/final/report.pdf`, combines Phases 2–5 in NeurIPS format (official
+`neurips_2025.sty`, preprint mode) with the NeurIPS paper checklist and the model card as
+appendices. It adds no new experiments: every number comes from a committed result file.
+
+| Command | What it produces |
+|---|---|
+| `make report-final` | The final report PDF (pandoc and tectonic) |
+| `make check-final` | Checks the PDF against the rubric: 8–12 main-text pages, 16 checklist answers, no placeholders, repository linked |
+
 ## Experiment tracking (MLflow)
 
 Everyone runs MLflow locally, backed by one shared Neon PostgreSQL database and one object

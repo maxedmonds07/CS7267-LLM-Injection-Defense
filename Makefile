@@ -19,7 +19,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 eda-report evaluate shortcut-check red-team red-team-data b1-optuna b2-report
+.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 report-phase5 phase5 phase5-scores phase5-fairness phase5-errors phase5-shap phase5-saliency phase5-latency red-team-b2 b2-checkpoint report-final check-final eda-report evaluate shortcut-check red-team red-team-data b1-optuna b2-report
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -128,6 +128,24 @@ report-phase4: ## Build the Phase 4 report PDF with pandoc and tectonic
 		--lua-filter=repo-links.lua --pdf-engine=tectonic -H header.tex -o report.pdf
 	@echo "Wrote $(PHASE4_DIR)/report.pdf"
 
+PHASE5_DIR := report/phase5
+
+report-phase5: ## Build the Phase 5 report PDF with pandoc and tectonic
+	cd $(PHASE5_DIR) && tail -n +2 ../../MODEL_CARD.md | pandoc -f markdown+lists_without_preceding_blankline report.md - --citeproc \
+		--lua-filter=repo-links.lua --pdf-engine=tectonic -H header.tex -o report.pdf
+	@echo "Wrote $(PHASE5_DIR)/report.pdf"
+
+FINAL_DIR := report/final
+
+report-final: ## Build the final NeurIPS-format report PDF with pandoc and tectonic
+	cd $(FINAL_DIR) && tail -n +2 ../../MODEL_CARD.md | pandoc -f markdown+lists_without_preceding_blankline \
+		report.md - checklist.md --columns=125 --citeproc --lua-filter=repo-links.lua --lua-filter=float-tables.lua --pdf-engine=tectonic \
+		-H header.tex -o report.pdf
+	@echo "Wrote $(FINAL_DIR)/report.pdf"
+
+check-final: ## Check the final report PDF against the rubric (pages, checklist, placeholders, repo link)
+	uv run python scripts/check_final_report.py $(FINAL_DIR)/report.pdf
+
 EDA_DIR := report/phase3
 
 # The write-up is notebooks/PHASE3_VISUAL_DATA.pdf, produced by notebooks/phase3_eda.py.
@@ -158,3 +176,34 @@ b1-optuna: ## Search B1's TF-IDF settings with Optuna on family folds, then eval
 
 b2-report: ## Choose B2's configuration on val and write b2_verdict.md and b2_deberta_<row>.csv
 	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/verdict.py --scores-dir report/deberta_scores --b1 report/baselines/b1_tfidf_lr.csv --out-dir report/baselines
+# Phase 5: explain and evaluate the frozen Phase 4 detectors (docs/phase5-requirements-tasks.md).
+# Nothing is retrained. B2 targets need the checkpoint: make b2-checkpoint.
+B2_CKPT := models/deberta/row2-s7267
+
+b2-checkpoint: ## Pull and unpack the B2 row2-s7267 checkpoint for the Phase 5 analyses
+	uv run dvc pull $(B2_CKPT).tar.dvc
+	mkdir -p $(B2_CKPT) && tar xf $(B2_CKPT).tar -C $(B2_CKPT)
+
+phase5-scores: ## Score val, test, MCPTox and MSB with every frozen detector -> report/phase5/scores.parquet
+	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/phase5_scores.py
+
+phase5-fairness: phase5-scores ## Metrics by group with Wilson FPR intervals -> report/phase5/fairness.csv
+	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/fairness.py
+
+phase5-errors: phase5-scores ## Rule-based failure-mode taxonomy -> report/phase5/errors/
+	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/error_taxonomy.py
+
+phase5-shap: phase5-scores ## SHAP attributions for B1 and B1-Optuna -> report/phase5/shap/
+	PYTHONPATH="$(SRC_PATH)" uv run --group explain python src/eval/explain_tfidf.py
+
+phase5-saliency: ## Integrated-gradients saliency for B2 (CPU) -> report/phase5/saliency/
+	PYTHONPATH="$(SRC_PATH)" uv run --group deberta --group explain python src/eval/saliency_b2.py
+
+red-team-b2: ## Red-team mutations scored with the B2 checkpoint -> report/red_team/deberta_row2_s7267/
+	PYTHONPATH="$(SRC_PATH)" uv run --group deberta python src/eval/red_team_b2.py
+
+phase5-latency: ## Inference latency, size and fit time per detector (run on an idle machine) -> report/phase5/latency.csv
+	PYTHONPATH="$(SRC_PATH)" uv run --group perplexity --group deberta python scripts/bench_latency.py
+
+phase5: phase5-fairness phase5-errors phase5-shap phase5-saliency phase5-latency ## Every Phase 5 analysis (then make report-phase5)
+	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/red_team.py --detector tfidf-optuna
