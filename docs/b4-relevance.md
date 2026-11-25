@@ -2,7 +2,7 @@
 
 **B4 does not transfer.** Every configuration scored about 0.99 AUROC in distribution and below 0.5 on both holdouts, where the length-only baseline did better. Adding task context moved holdout AUROC toward chance without improving detection at a fixed false-positive rate. The two explicit relevance features, the question B4 was designed to answer, lowered holdout AUROC.
 
-`relevance` fills the B4 row in the B1–B4 comparison because the preset selection rule picked it on validation. Validation was saturated, so this choice says nothing about transfer (see [Selection and results](#selection-and-results)). [Selection record](../report/b4/selection.json)
+`relevance` is the configuration reported as B4 because the preset selection rule picked it on validation. Validation was saturated, so this choice says nothing about transfer (see [Selection and results](#selection-and-results)). [Selection record](../report/b4/selection.json)
 
 ## What we trained
 
@@ -28,7 +28,7 @@ A separate logistic regression used only the two numerical features and scored 0
 
 We kept the original labels and split assignments, joined context by row ID, and verified each candidate’s text hash. PoisonedRAG supplied original questions. For BIPIA we used the question, code and error text, or a fixed instruction for the summarization task. Where a BIPIA group had several questions, we used the first in lexical order for both clean and attacked rows. For MCPTox and MSB tool descriptions, the server’s catalogue of legitimate tasks served as a proxy for an individual request. Clean and attacked descriptions from a server received the same catalogue. [Context construction](../src/data/b4_data.py)
 
-The mixed-source runs used 7,217 training rows. Each BIPIA-only run used 4,008. All configurations used the same 1,416 validation rows and the same evaluation rows, including for the text-only control. Coverage was 1,434/1,434 for the in-distribution test, 672/847 for MCPTox (servers with a task catalogue), and 76/91 for MSB (tool descriptions). The 15 MSB tool-output rows lacked a task mapping. For a direct comparison with the earlier candidate-text DeBERTa (B3 here, called B2 in the Phase 4 report), match the holdout row IDs first. [Per-run evaluation counts](../report/b4/per_run.csv) · [Earlier DeBERTa study](../report/phase4/report.md)
+The mixed-source runs used 7,217 training rows. Each BIPIA-only run used 4,008. All configurations used the same 1,416 validation rows and the same evaluation rows, including for the text-only control. Coverage was 1,434/1,434 for the in-distribution test, 672/847 for MCPTox (servers with a task catalogue), and 76/91 for MSB (tool descriptions). The 15 MSB tool-output rows lacked a task mapping. For a direct comparison with the earlier candidate-text DeBERTa (B2 in the Phase 4 and final reports), match the holdout row IDs first. [Per-run evaluation counts](../report/b4/per_run.csv) · [Earlier DeBERTa study](../report/phase4/report.md)
 
 ## Selection and results
 
@@ -50,7 +50,9 @@ At the threshold set on validation, `relevance` flagged 17.3% of MCPTox attacks 
 
 ### Why the holdout scores fall below chance
 
-The likely cause is a length shortcut that reverses between training and the holdouts. In the training sources, PoisonedRAG attacks are shorter than benign passages: on its test rows, the length-only score has AUROC 0.138. On the holdouts, attacks are longer, with length-only AUROC 0.760 on MCPTox and 0.907 on MSB. A model that learned "shorter means attack" would rank the holdouts backwards. On MCPTox, `text_control` has a raw AUROC of 0.339 but scores 0.672 when AUROC is computed within length bins, which fits this explanation. MSB does not show the same pattern (0.333 within length bins), but it has only 21 benign rows. This is a diagnosis, not a tested cause. [Length baseline by source](../report/b4/reference_length.csv) · [Length-binned AUROC per run](../report/b4/per_run.csv)
+The cause is not settled. One candidate is a length shortcut that reverses between training and the holdouts. In training, PoisonedRAG attacks are shorter than benign passages: on its test rows, the length-only score has AUROC 0.138. On the holdouts, attacks are longer, with length-only AUROC 0.760 on MCPTox and 0.907 on MSB. On MCPTox, `text_control` has a raw AUROC of 0.339 but scores 0.672 when AUROC is computed within length bins, which fits a learned "shorter means attack" rule.
+
+Two results go against length being the main cause. Training on BIPIA only, which removes PoisonedRAG's short attacks, lowered MCPTox AUROC both here (0.454 to 0.397) and for B2 in the final report (0.346 to 0.199). MSB does not show the within-bin gain either (0.333), although it has only 21 benign rows. The final report's saliency analysis offers another account: B2 scores 98–100% of MCPTox rows below 0.01, so the detector barely responds to tool descriptions at all. [Length baseline by source](../report/b4/reference_length.csv) · [Length-binned AUROC per run](../report/b4/per_run.csv) · [Final report](../report/final/report.md)
 
 **MSB results are noisy.** With 21 benign and 55 attacked rows, seed standard deviations reach 0.15 AUROC. The t-intervals in `summary.md` are not clipped to [0, 1], so some fall below zero. Report the direction of MSB effects, not their size.
 
