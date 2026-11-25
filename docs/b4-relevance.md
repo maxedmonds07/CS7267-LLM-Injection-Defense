@@ -4,6 +4,8 @@ Open `notebooks/b4_colab.ipynb` in Google Colab and select a GPU runtime. The no
 
 The default data mode pulls the team's original parquet, raw files and reconstructed BIPIA sources through DVC. Enable notebook access to Colab Secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`. Alternatively, set `DATA_MODE = "upload"` and provide the original `dataset.parquet`, paired context parquet and coverage CSV from the same build. Prepare the latter two locally with `python src/data/b4_data.py --out .cache/b4-verification/contexts.parquet` in the project environment. Keep the dataset, paired contexts, checkpoints and model artifacts in team-authorized storage.
 
+To keep the local layout on Drive, upload the prepared `dist` directory under your Drive project folder. In the notebook set `DATA_MODE = "upload"` and `DRIVE_PROJECT` to the absolute Colab path of that project folder. The notebook reads the ZIP and inputs from `dist/cs7267-b4/b4-relevance-v1/` and writes experiment outputs under `My Drive/cs7267-b4/<STUDY>/`.
+
 Run the smoke setting first to train and reload a model and score validation. Set `MODE = "full"` to run all four configurations for seeds 7267–7269. The notebook can resume at epoch boundaries, saves the selected checkpoint for each seed and discards intermediate optimizer state once that seed finishes. Allow space for twelve saved DeBERTa models and the active run's training checkpoints on Drive. The Colab runtime also needs disk space for dependencies, DVC data and model downloads.
 
 | Comparison | Question |
