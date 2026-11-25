@@ -14,7 +14,7 @@ adversarial or benign, and measures how well it generalizes:
 
 AgentDojo is pinned as the end-to-end attack-success harness for evaluating a defended agent.
 
-**Status:** B2 DeBERTa verdict is **fail**. The selected configuration is **row2** (pairwise weight 0.5). On MCPTox, none of its three seeds beat B1's TPR bar of 0.2247. Row 1 seed 7267 was trained before gradient clipping, so the later row 1 seeds are not identical to it, and that is not a reason to retrain row1-s7267. Experiments are tracked in the team's shared MLflow server.
+The Phase 4 verdict for B2 DeBERTa is **fail**. The selected configuration is **row2** (pairwise weight 0.5). On MCPTox, none of its three seeds beat B1's TPR bar of 0.2247. Row 1 seed 7267 was trained before gradient clipping, so the later row 1 seeds are not identical to it, and that is not a reason to retrain row1-s7267. Phase 4 runs are tracked in the team's shared MLflow server.
 
 ## Repository layout
 
@@ -155,11 +155,11 @@ and push the data so teammates can `make data`.
 
 ## Detectors
 
-The [B4 Colab notebook](notebooks/b4_colab.ipynb) runs the paired DeBERTa relevance experiments. See the [B4 experiment guide](docs/b4-relevance.md) for setup, task-context coverage and interpretation.
+The completed **B4** study trained four DeBERTa configurations with three seeds each. Its main model, `relevance`, jointly encodes the task context and candidate and adds two lexical features. A separately fine-tuned `pair_only` model received the same text pair with zero explicit features. All four configurations used the same 1,434 test rows and the rows with task context on MCPTox (672/847) and MSB (76/91). [B4 methodology](docs/b4-relevance.md) · [Results](report/b4/summary.md) · [Colab notebook](notebooks/b4_colab.ipynb)
 
-Every detector is fit on `train_pool` train, picks its hyperparameters and its decision
-threshold on `train_pool` val, and is reported on the `train_pool` test split and on every row
-of MCPTox (LOSO) and MSB (transfer), next to the length-only baseline:
+The earlier candidate-text experiments used the full MCPTox (LOSO) and MSB (transfer) holdouts.
+Their shared evaluation harness sets the decision threshold on benign `train_pool` validation
+examples and reports the test and holdout metrics alongside a length-only baseline.
 
 ```bash
 make evaluate DETECTOR=tfidf # print the report

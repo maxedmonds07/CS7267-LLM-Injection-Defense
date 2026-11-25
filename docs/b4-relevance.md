@@ -1,23 +1,51 @@
 # B4 relevance experiments
 
-Open `notebooks/b4_colab.ipynb` in Google Colab and select a GPU runtime. The notebook runs from a code archive so it also works with unpublished local changes. Build the archive from the project root with `python scripts/package_b4_colab.py`. It writes `dist/cs7267-b4/b4-relevance-v1/b4-colab-source.zip`; pass `--study <name>` to match a different `STUDY`. On the first run the notebook prompts for that ZIP and caches it in your Google Drive. Use a new run directory after changing code, data or experiment settings.
+**The main B4 model is `relevance`.** It reads the trusted task context and the candidate text together and uses two explicit measures of their lexical overlap. Validation selected this configuration for the B4 row in the B1–B4 comparison. [Selection record](../report/b4/selection.json)
 
-The default data mode pulls the team's original parquet, raw files and reconstructed BIPIA sources through DVC. Enable notebook access to Colab Secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`. Alternatively, set `DATA_MODE = "upload"` and provide the original `dataset.parquet`, paired context parquet and coverage CSV from the same build. Prepare all three locally with `python scripts/package_b4_colab.py --inputs`, which writes them to `dist/cs7267-b4/<STUDY>/inputs/` with the names the notebook expects. Keep the dataset, paired contexts, checkpoints and model artifacts in team-authorized storage.
+## What we trained
 
-To skip the upload prompts, run `python scripts/package_b4_colab.py --inputs --study <STUDY>` and upload the resulting `dist` directory under your Drive project folder. In the notebook set `DATA_MODE = "upload"`, the same `STUDY`, and `DRIVE_PROJECT` to the absolute Colab path of that project folder. The notebook reads the ZIP and inputs from `dist/cs7267-b4/<STUDY>/` and writes experiment outputs under `My Drive/cs7267-b4/<STUDY>/`.
+Each configuration started from `microsoft/deberta-v3-base` for each seed (7267, 7268, 7269), giving 12 independent fine-tunes. The candidate was the passage, tool output, or tool description being classified as benign or adversarial. A pair consisted of the trusted task context and that candidate.
 
-Run the smoke setting first to train and reload a model and score validation. Set `MODE = "full"` to run all four configurations for seeds 7267–7269. The notebook can resume at epoch boundaries, saves the selected checkpoint for each seed and discards intermediate optimizer state once that seed finishes. Allow space for twelve saved DeBERTa models and the active run's training checkpoints on Drive. The Colab runtime also needs disk space for dependencies, DVC data and model downloads.
+| Configuration | Encoder input | Explicit features | Training sources | Comparison |
+|---|---|---|---|---|
+| `text_control` | Candidate alone | None | BIPIA + PoisonedRAG | Baseline for adding context |
+| `pair_only` | Task context + candidate | None | BIPIA + PoisonedRAG | Compare with `text_control` to measure the contribution of context |
+| **`relevance`** | Task context + candidate | TF-IDF cosine and task-token coverage | BIPIA + PoisonedRAG | Compare with `pair_only` to measure the contribution of the two features |
+| `relevance_bipia` | Task context + candidate | Same two features | BIPIA only | Compare with `relevance` to measure the effect of removing PoisonedRAG from training |
 
-| Comparison | Question |
-|---|---|
-| Text control → pair only | Does adding task context help? |
-| Pair only → paired inputs plus relevance | Do explicit lexical relevance features help? |
-| Both training sources → BIPIA only, using relevance | How does removing PoisonedRAG affect transfer? |
+The paired encoder read up to 128 task tokens alongside each overlapping 256-token candidate window (stride 192). In `pair_only`, the linear classifier received the first token’s hidden state. In `relevance` and `relevance_bipia`, we appended two numbers to that representation.
 
-The encoder reads up to 128 task tokens alongside each overlapping 256-token candidate window. Every candidate token appears in a window. The classifier uses the first token's hidden state and, in the relevance configuration, two additional values. These are character 3–5-gram TF-IDF cosine similarity and the fraction of distinct task tokens that occur in the candidate. They are computed on the full strings. Only supported training rows fit the vectorizer. The model takes the maximum window logit and trains using binary cross-entropy. Schema agreement is deferred.
+1. **TF-IDF cosine similarity** between the full task and candidate strings, using character 3–5-grams within word boundaries. Each relevance run fitted its vocabulary and IDF weights on its own training pairs.
+2. **Task-token coverage**, the fraction of distinct, case-folded words in the full task text that also appeared in the candidate.
 
-**Task context and coverage.** The sidecar preserves original IDs and checks candidate hashes. PoisonedRAG supplies original questions. BIPIA supplies questions, code/error context, or a fixed summarization instruction. When the original build collapsed multiple questions for one context, the first in lexical order is used for both labels. For MCPTox and MSB descriptions we use a server's catalogue of legitimate tasks for both labels. This measures compatibility with a server's tasks. An individual runtime request could give a different relevance score. Servers without a catalogue and MSB outputs without a legitimate task mapping are excluded. Clean twins, ideal answers, risk tags and attack-specific queries never enter the model.
+The encoder and classifier were trained jointly with binary cross-entropy on the highest window logit for each candidate. We deferred schema agreement because the training pairs lacked consistent trusted schemas. [Feature definitions](../src/models/b4_features.py) · [Classification head](../src/models/b4_network.py)
 
-**Evaluation.** The optional two-rate sweep uses validation only. The full grid uses one common learning rate. Epoch selection uses validation TPR at 1% FPR and then validation AUROC. The validation comparison across configurations uses mean TPR and then mean log loss. Test, MCPTox and MSB are scored after the training grid finishes. All variants and the refitted length and TF-IDF references use the same supported evaluation rows. Original full-holdout B2/B3 metrics use different denominators. The primary feature comparison is the per-seed difference between relevance and pair-only at matched 5% FPR and in AUROC.
+A separate logistic regression used only the two numerical features and scored 0.5828 validation AUROC. Its predictions played no part in training or selecting the 12 DeBERTa models. Length-only and candidate-text TF-IDF baselines were also evaluated on the B4 rows. [Feature-only diagnostic](../report/b4/relevance_probe_validation.json) · [Length baseline](../report/b4/reference_length.csv) · [TF-IDF baseline](../report/b4/reference_tfidf.csv)
 
-The notebook generates per-row score files, per-seed reports with bootstrap intervals, paired differences, mean/SD and t-intervals across seeds, validation selection, a figure and a Markdown summary. The source/label coverage table identifies exclusions. Report the denominators with any LOSO or transfer claim.
+## Examples and task context
+
+We kept the original labels and split assignments, joined context by row ID, and verified each candidate’s text hash. PoisonedRAG supplied original questions. For BIPIA we used the question, code and error text, or a fixed instruction for the summarization task. Where a BIPIA group had several questions, we used the first in lexical order for both clean and attacked rows. For MCPTox and MSB tool descriptions, the server’s catalogue of legitimate tasks served as a proxy for an individual request. Clean and attacked descriptions from a server received the same catalogue. [Context construction](../src/data/b4_data.py)
+
+The mixed-source runs used 7,217 training rows. Each BIPIA-only run used 4,008. All configurations used the same 1,416 validation rows and the same evaluation rows, including for the text-only control. Coverage was 1,434/1,434 for the in-distribution test, 672/847 for MCPTox (servers with a task catalogue), and 76/91 for MSB (tool descriptions). The 15 MSB tool-output rows lacked a task mapping. For a direct comparison with the earlier candidate-text DeBERTa (B3 here, called B2 in the Phase 4 report), match the holdout row IDs first. [Per-run evaluation counts](../report/b4/per_run.csv) · [Earlier DeBERTa study](../report/phase4/report.md)
+
+## Selection and results
+
+The reported study used **three epochs per run**, batch size 16, and a base learning rate of `2e-5` with the optional sweep disabled. Within a run, we selected the epoch with the highest validation true-positive rate (TPR) at a threshold targeting a 1% false-positive rate (FPR) on benign validation examples. Ties used validation AUROC. Across configurations, we selected by mean validation TPR over the three seeds, breaking ties by lower mean validation log loss. The selected `relevance` checkpoints had mean validation TPR 1.000 and mean validation log loss 0.0090. We scored the test and holdout examples after all 12 fine-tunes finished. [Training configuration](../configs/b4.yaml) · [Validation results](../report/b4/validation_selection.csv)
+
+| Evaluation set | `pair_only` mean AUROC | **B4 `relevance` mean AUROC** | 95% interval for the B4 mean across seeds |
+|---|---:|---:|---|
+| In-distribution test | 0.9910 | 0.9900 | 0.9856–0.9944 |
+| MCPTox (unseen surface) | 0.5056 | 0.4536 | 0.2079–0.6993 |
+| MSB (unseen benchmark) | 0.3348 | 0.2573 | 0.0495–0.4651 |
+
+Adding context (`text_control → pair_only`) increased AUROC for all three seeds on both holdouts. Adding explicit features (`pair_only → relevance`) lowered mean AUROC by 0.0520 on MCPTox and 0.0775 on MSB. One MCPTox seed improved. All three MSB seeds declined. Mean TPR at a matched 5% FPR also fell on both holdouts. That metric sets a threshold on each evaluation set’s benign rows. [All four configurations](../report/b4/summary.md) · [Per-seed differences](../report/b4/ablation_deltas.csv)
+
+To retrieve the B4 values in the table, filter `seed_summary.csv` to `experiment = relevance`, `slice = all`, and `metric = auroc`. Its 95% t-intervals describe variation in the mean across training seeds. The AUROC intervals in `per_run.csv` use 1,000 bootstrap resamples of evaluation rows within each label for a single trained model. [Metrics across seeds](../report/b4/seed_summary.csv) · [Per-run metrics](../report/b4/per_run.csv)
+
+## Reproducing the completed study
+
+1. With the local processed, raw, and generated data available, run `python scripts/package_b4_colab.py --inputs` in the project environment. Upload `dist/cs7267-b4/b4-relevance-v1/` at the same relative path inside your Drive project. It contains the source ZIP and the three input files (`dataset.parquet`, `contexts.parquet`, and `contexts.coverage.csv`).
+2. Open the notebook with a Colab GPU runtime. Use `STUDY = "b4-relevance-v1"`, `DATA_MODE = "upload"`, and set `DRIVE_PROJECT` to the Drive project folder containing `dist`. The reported study used `MODE = "full"` and `INCLUDE_SWEEP = False`. The optional smoke mode checks a small training run on validation. [Colab notebook](../notebooks/b4_colab.ipynb)
+3. Find the results in `My Drive/cs7267-b4/<STUDY>/experiments-fixed/reports/`. Keep the same study and settings to resume at an epoch boundary. For different code, data, or settings, package a new study using `--study <name>` and set `STUDY` accordingly. Allow Drive space for all 12 models and the active checkpoint.
+
+For the alternative DVC workflow, package the source without `--inputs`, leave `DRIVE_PROJECT` blank, and use `DATA_MODE = "dvc"`. The notebook can prompt for the source ZIP and cache it in the study folder. DVC uses the read-only `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY` in Colab Secrets to fetch the inputs. Keep data, paired contexts, and models in team-authorized storage.
