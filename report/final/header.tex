@@ -1,0 +1,23 @@
+% Preamble for the final report (pandoc -H header.tex): the official NeurIPS 2025 style in
+% preprint mode (author names shown, no line numbers), with the footer notice replaced so the
+% paper does not present itself as a NeurIPS submission or publication.
+\usepackage[preprint,nonatbib]{neurips_2025}
+\makeatletter
+\renewcommand{\@noticestring}{CS 7267 Machine Learning, Kennesaw State University. Final project report, December 2026.}
+\makeatother
+% The style sets \rmdefault to ptm (Times), which XeTeX (tectonic) cannot load; use the
+% OpenType Times clone instead.
+\setmainfont[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold, ItalicFont=*-italic,
+  BoldItalicFont=*-bolditalic]{texgyretermes}
+\setmathfont{texgyretermes-math.otf}
+
+
+\usepackage{microtype}
+\usepackage{booktabs,array,calc}  % tables are raw LaTeX (float-tables.lua), so pandoc does not load these
+\usepackage{etoolbox}
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, skip=4pt}
+\captionsetup[table]{position=above}
+\setlength{\tabcolsep}{4pt}
+\usepackage{float}
+\floatplacement{figure}{tbp}

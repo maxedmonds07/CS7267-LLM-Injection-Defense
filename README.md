@@ -219,6 +219,17 @@ recommended detector is documented in [MODEL_CARD.md](MODEL_CARD.md).
 `make phase5` runs every analysis. SHAP and saliency need the `explain` dependency group,
 which the targets select.
 
+## Final report
+
+The final paper, `report/final/report.pdf`, combines Phases 2–5 in NeurIPS format (official
+`neurips_2025.sty`, preprint mode) with the NeurIPS paper checklist and the model card as
+appendices. It adds no new experiments: every number comes from a committed result file.
+
+| Command | What it produces |
+|---|---|
+| `make report-final` | The final report PDF (pandoc and tectonic) |
+| `make check-final` | Checks the PDF against the rubric: 8–12 main-text pages, 16 checklist answers, no placeholders, repository linked |
+
 ## Experiment tracking (MLflow)
 
 Everyone runs MLflow locally, backed by one shared Neon PostgreSQL database and one object
