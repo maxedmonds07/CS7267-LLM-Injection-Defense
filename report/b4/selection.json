@@ -1,0 +1,5 @@
+{
+  "selected_experiment": "relevance",
+  "rule": "mean validation TPR at 1% FPR; ties by mean validation log loss",
+  "scope": "Supported-context cohort; no B2 verdict is replaced"
+}

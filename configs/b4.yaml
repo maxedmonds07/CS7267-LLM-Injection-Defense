@@ -1,0 +1,37 @@
+# Frozen experiment definitions; change before experiments, then use a new output directory.
+version: 1
+seeds: [7267, 7268, 7269]
+model:
+  model_name: microsoft/deberta-v3-base
+  epochs: 3
+  lr: 0.00002
+  batch_size: 16
+  chunk_tokens: 256
+  chunk_stride: 192
+  context_tokens: 128
+  max_chunks: 16
+  max_grad_norm: 1.0
+  relevance_max_features: 50000
+  fp16: true
+experiments:
+  - name: text_control
+    input_mode: text
+    train_sources: [bipia, poisonedrag]
+  - name: pair_only
+    input_mode: pair
+    train_sources: [bipia, poisonedrag]
+  - name: relevance
+    input_mode: relevance
+    train_sources: [bipia, poisonedrag]
+  - name: relevance_bipia
+    input_mode: relevance
+    train_sources: [bipia]
+search:
+  enabled: false
+  learning_rates: [0.00001, 0.00002]
+evaluation:
+  target_fpr: 0.01
+  n_boot: 1000
+smoke:
+  limit: 32
+  epochs: 1
