@@ -155,7 +155,7 @@ and push the data so teammates can `make data`.
 
 ## Detectors
 
-The completed **B4** study trained four DeBERTa configurations with three seeds each. Its main model, `relevance`, jointly encodes the task context and candidate and adds two lexical features. A separately fine-tuned `pair_only` model received the same text pair with zero explicit features. All four configurations used the same 1,434 test rows and the rows with task context on MCPTox (672/847) and MSB (76/91). [B4 methodology](docs/b4-relevance.md) · [Results](report/b4/summary.md) · [Colab notebook](notebooks/b4_colab.ipynb)
+The completed **B4** study trained four DeBERTa configurations with three seeds each. Its main model, `relevance`, jointly encodes the task context and candidate and adds two lexical features. A separately fine-tuned `pair_only` model received the same text pair with zero explicit features. **B4 does not transfer:** every configuration scored below 0.5 AUROC on both holdouts, below the length-only baseline. Task context moved the scores toward chance, and the relevance features lowered them. All four configurations used the same 1,434 test rows and the rows with task context on MCPTox (672/847) and MSB (76/91). [B4 methodology](docs/b4-relevance.md) · [Results](report/b4/summary.md) · [Colab notebook](notebooks/b4_colab.ipynb)
 
 The earlier candidate-text experiments used the full MCPTox (LOSO) and MSB (transfer) holdouts.
 Their shared evaluation harness sets the decision threshold on benign `train_pool` validation
