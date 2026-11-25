@@ -155,6 +155,8 @@ and push the data so teammates can `make data`.
 
 ## Detectors
 
+The [B4 Colab notebook](notebooks/b4_colab.ipynb) runs the paired DeBERTa relevance experiments. See the [B4 experiment guide](docs/b4-relevance.md) for setup, task-context coverage and interpretation.
+
 Every detector is fit on `train_pool` train, picks its hyperparameters and its decision
 threshold on `train_pool` val, and is reported on the `train_pool` test split and on every row
 of MCPTox (LOSO) and MSB (transfer), next to the length-only baseline:

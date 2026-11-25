@@ -1,0 +1,21 @@
+# B4 relevance experiments
+
+Open `notebooks/b4_colab.ipynb` in Google Colab and select a GPU runtime. The notebook runs from a code archive so it also works with unpublished local changes. Build the archive from the project root with `python scripts/package_b4_colab.py`. On the first run the notebook prompts for `dist/b4-colab-source.zip` and caches it in your Google Drive. Use a new run directory after changing code, data or experiment settings.
+
+The default data mode pulls the team's original parquet, raw files and reconstructed BIPIA sources through DVC. Enable notebook access to Colab Secrets `R2_ACCESS_KEY_ID` and `R2_SECRET_ACCESS_KEY`. Alternatively, set `DATA_MODE = "upload"` and provide the original `dataset.parquet`, paired context parquet and coverage CSV from the same build. Prepare the latter two locally with `python src/data/b4_data.py --out .cache/b4-verification/contexts.parquet` in the project environment. Keep the dataset, paired contexts, checkpoints and model artifacts in team-authorized storage.
+
+Run the smoke setting first to train and reload a model and score validation. Set `MODE = "full"` to run all four configurations for seeds 7267–7269. The notebook can resume at epoch boundaries, saves the selected checkpoint for each seed and discards intermediate optimizer state once that seed finishes. Allow space for twelve saved DeBERTa models and the active run's training checkpoints on Drive. The Colab runtime also needs disk space for dependencies, DVC data and model downloads.
+
+| Comparison | Question |
+|---|---|
+| Text control → pair only | Does adding task context help? |
+| Pair only → paired inputs plus relevance | Do explicit lexical relevance features help? |
+| Both training sources → BIPIA only, using relevance | How does removing PoisonedRAG affect transfer? |
+
+The encoder reads up to 128 task tokens alongside each overlapping 256-token candidate window. Every candidate token appears in a window. The classifier uses the first token's hidden state and, in the relevance configuration, two additional values. These are character 3–5-gram TF-IDF cosine similarity and the fraction of distinct task tokens that occur in the candidate. They are computed on the full strings. Only supported training rows fit the vectorizer. The model takes the maximum window logit and trains using binary cross-entropy. Schema agreement is deferred.
+
+**Task context and coverage.** The sidecar preserves original IDs and checks candidate hashes. PoisonedRAG supplies original questions. BIPIA supplies questions, code/error context, or a fixed summarization instruction. When the original build collapsed multiple questions for one context, the first in lexical order is used for both labels. For MCPTox and MSB descriptions we use a server's catalogue of legitimate tasks for both labels. This measures compatibility with a server's tasks. An individual runtime request could give a different relevance score. Servers without a catalogue and MSB outputs without a legitimate task mapping are excluded. Clean twins, ideal answers, risk tags and attack-specific queries never enter the model.
+
+**Evaluation.** The optional two-rate sweep uses validation only. The full grid uses one common learning rate. Epoch selection uses validation TPR at 1% FPR and then validation AUROC. The validation comparison across configurations uses mean TPR and then mean log loss. Test, MCPTox and MSB are scored after the training grid finishes. All variants and the refitted length and TF-IDF references use the same supported evaluation rows. Original full-holdout B2/B3 metrics use different denominators. The primary feature comparison is the per-seed difference between relevance and pair-only at matched 5% FPR and in AUROC.
+
+The notebook generates per-row score files, per-seed reports with bootstrap intervals, paired differences, mean/SD and t-intervals across seeds, validation selection, a figure and a Markdown summary. The source/label coverage table identifies exclusions. Report the denominators with any LOSO or transfer claim.
