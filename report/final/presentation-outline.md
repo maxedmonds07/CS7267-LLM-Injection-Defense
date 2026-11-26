@@ -141,7 +141,7 @@ Ahmed 2:45, Oluwamayowa Adewummi 1:55.
   transfer, and reading the user's task did not fix it.
 - Deploy B1-Optuna with guardrails, not on MCP (35% recall at 6.9% FPR there).
 - The bottleneck is data (*follow-up*): two MCPTox servers in training lift held-out AUROC from
-  0.767 to 0.966; next, tool descriptions from a source other than MCPTox.
+  0.764 to 0.966 on the same servers; next, tool descriptions from a source other than MCPTox.
 
 ## Backup slides
 
