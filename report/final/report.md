@@ -3,7 +3,7 @@ title: "Detecting Prompt Injection Across RAG and MCP Surfaces: Detectors Learn 
 author: |
   ```{=latex}
   Carter Corbin\qquad Max Edmonds\qquad Mohammed Adil Ahmed\\
-  Oluwamayowa Adewummi\qquad Adedapo Odeyemi\\[0.4em]
+  \textbf{Oluwamayowa Adewummi\qquad Adedapo Odeyemi}\\[0.4em]
   College of Computing and Software Engineering, Kennesaw State University, Kennesaw, GA\\
   \url{https://github.com/maxedmonds07/CS7267-LLM-Injection-Defense}
   ```
