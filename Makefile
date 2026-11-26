@@ -19,7 +19,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 report-phase5 phase5 phase5-scores phase5-fairness phase5-errors phase5-shap phase5-saliency phase5-latency red-team-b2 b2-checkpoint report-final check-final eda-report evaluate shortcut-check red-team red-team-data b1-optuna b2-report
+.PHONY: help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 report-phase5 phase5 phase5-scores phase5-fairness phase5-errors phase5-shap phase5-saliency phase5-latency red-team-b2 b2-checkpoint report-final check-final eda-report evaluate shortcut-check red-team red-team-data b1-optuna b1-family-cv b2-report
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -173,6 +173,9 @@ red-team-data: ## Write the mutated test rows to data/red_team/test_mutations.pa
 # ARGS=--log-only uploads a finished study to MLflow without re-running it.
 b1-optuna: ## Search B1's TF-IDF settings with Optuna on family folds, then evaluate the best once
 	PYTHONPATH="$(SRC_PATH)" uv run python src/models/tfidf_optuna.py $(ARGS)
+
+b1-family-cv: ## Family-grouped 5-fold CV of B1 on train_pool train -> report/baselines/b1_family_cv.csv
+	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/b1_tfidf_lr.py $(ARGS)
 
 b2-report: ## Choose B2's configuration on val and write b2_verdict.md and b2_deberta_<row>.csv
 	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/verdict.py --scores-dir report/deberta_scores --b1 report/baselines/b1_tfidf_lr.csv --out-dir report/baselines
