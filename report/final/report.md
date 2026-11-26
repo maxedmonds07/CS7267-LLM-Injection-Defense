@@ -293,7 +293,8 @@ B1-Optuna improves on B1 (0.922 vs 0.902, above B1's interval), and both rank by
 (length-binned AUROC 0.989 ± 0.003 and 0.918). Length and perplexity are near chance.
 
 **On MCP tool descriptions the order reverses.** B1-Optuna is the strongest trained detector by raw AUROC but
-only ties raw length, with overlapping intervals; its length-binned AUROC of 0.725 shows that it
+only ties raw length, with overlapping intervals (paired server bootstrap of the difference:
+−0.007, 95% interval −0.105 to +0.099; Appendix \ref{app:followup}); its length-binned AUROC of 0.725 shows that it
 does rank within texts of similar length, so it is a weak detector rather than a length proxy.
 B2 and B0 fall *below chance* by raw AUROC, but B0 has the highest length-binned AUROC in the
 table (0.739): within texts of similar length it ranks attacks above benign rows, and only the
@@ -374,6 +375,8 @@ change an argument. These phrasings occur in 1.0% and 0.2% of training-pool test
 50.7% and 37.3% of MCPTox attacks. Because the prerequisite cue is in half of all attacks, its
 59% share of B1-Optuna's misses is close to its base rate; the informative contrast is that
 B1-Optuna misses 75% of prerequisite attacks (185 of 246) against 55% of the rest (131 of 239).
+By MCPTox's three attack templates its recall at the deployed threshold is 0.30, 0.21 and 0.48
+(Table \ref{tbl:templates}).
 The surface is learnable, since the prerequisite cue occurs in only 0.6% of MCPTox's *benign*
 descriptions: that single regex would flag 50.7% of attacks at 0.6% FPR, against B1-Optuna's
 34.8% at 6.9%. It was written after reading holdout errors, so it is an oracle reference, not a
@@ -444,7 +447,11 @@ benign (Figure \ref{fig:saliency}). Across all three seeds B2 scores 98–100% o
 AUROC is not a confident inversion, but it is not noise either: among these near-zero scores B2
 rates longer text as more benign, a habit PoisonedRAG's short poisoned passages would teach, and
 MCP attacks are longer than benign descriptions. **B2 does not respond to the surface's
-phrasing; it ranks MCP rows by inverse length.**
+phrasing; it ranks MCP rows by inverse length.** Its score falls with length on MCPTox (Spearman
+−0.45, −0.77 and −0.73 by seed; −0.57 to −0.85 among benign rows alone), as it does among
+in-distribution benign rows (seed 7268: −0.53 on BIPIA, −0.83 on PoisonedRAG). Dropping the 241
+benign descriptions shorter than the shortest attack (133 characters) lifts its AUROC to 0.727,
+0.595 and 0.616 (Appendix \ref{app:followup}).
 
 # Deployment: Robustness, Fairness, Cost and Harms {#sec:deploy}
 
@@ -606,12 +613,33 @@ make b2-report                 # B2 tables and pre-registered verdict from the s
 make b2-checkpoint             # B2 row2-s7267 checkpoint (DVC)
 make phase5                    # fairness, error taxonomy, SHAP, saliency, latency
 make red-team DETECTOR=tfidf-optuna && make red-team-b2
+make followup-length          # B2 vs length, MCPTox templates, paired bootstrap -> report/followup/
 make report-final check-final  # this PDF and its rubric check
 ```
 
 Seeds are fixed (7267 by default; B2 seeds 7267–7269). Score files for every eval row are
 committed (`report/phase5/scores.parquet`, no text) and reproduce every AUROC and deployed FPR in
 Table \ref{tbl:main} exactly.
+
+# Follow-up Analyses {#app:followup}
+
+These analyses read MCPTox after the pre-registered evaluation and are not part of it; no
+detector was changed. Scores are the committed per-row scores (`make followup-length`).
+
+| MCPTox template | Attacks | Length AUROC | B1-Optuna AUROC | B1-Optuna recall |
+|:----------------|------:|------:|------:|------:|
+| Template-1 | 77 | 0.776 | 0.733 | 0.299 |
+| Template-2 | 183 | 0.761 | 0.736 | 0.213 |
+| Template-3 | 225 | 0.784 | 0.805 | 0.476 |
+
+Table: Each MCPTox template's attacks against all 362 MCPTox benign descriptions. Recall at B1-Optuna's deployed threshold (1% validation FPR). {#tbl:templates}
+
+**Detectors against length.** A paired bootstrap over the 45 MCPTox servers gives B1-Optuna minus
+length a difference of −0.007 (95% interval −0.105 to +0.099): a tie. A plain rank average of the
+two scores reaches 0.821, +0.047 over length (−0.007 to +0.100), so they carry partly different
+information.
+
+![B2 (seed 7268) score against length on MCPTox. Scores fall with length for both labels; attacks are longer, so the raw ordering is below chance.](../followup/b2_length.png){#fig:b2length width=70%}
 
 # Model Card {#app:card}
 
