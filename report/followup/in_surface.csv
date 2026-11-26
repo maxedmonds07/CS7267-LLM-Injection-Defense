@@ -1,0 +1,4 @@
+experiment,auroc,binned_auroc,recall,fpr,n,folds
+in_surface_by_subset,0.999,0.999,1.000,0.309,847,45
+in_surface_by_template,0.996,0.997,1.000,0.370,533,3
+msb_to_mcptox,0.859,0.762,0.942,0.453,847,1
