@@ -59,27 +59,28 @@ def few_shot(data, mcptox: pd.DataFrame, fit: Fit = b1_optuna_fit, ks=KS, draws=
     """For each draw and k, train on data.train plus k random MCPTox servers, test on the rest."""
     rng = np.random.default_rng(seed)
     servers = np.array(sorted(mcptox.subset.unique()))
-    base = data.train[["text", "label"]]
+    base_train = data.train[["text", "label"]]
     val_benign = data.val.text[data.val.label == 0]
-    rows, k0 = [], None
+    base = fit(base_train)
+    base_threshold = _threshold(base, val_benign)
+    rows = []
     for draw in range(draws):
         order = rng.permutation(servers)
         for k in ks:
             k_used = min(k, len(servers) - 1)
+            chosen = set(order[:k_used])
+            test = mcptox[~mcptox.subset.isin(chosen)]
+            # The k=0 model on this row's own test servers, so each lift compares like with like.
+            baseline = score_block(base.predict_proba(test.text), test.label, test.text, base_threshold)
             if k_used == 0:
-                if k0 is None:
-                    model = fit(base)
-                    k0 = score_block(model.predict_proba(mcptox.text), mcptox.label, mcptox.text,
-                                     _threshold(model, val_benign))
-                result = k0
+                result = baseline
             else:
-                chosen = set(order[:k_used])
                 added = mcptox[mcptox.subset.isin(chosen)]
-                test = mcptox[~mcptox.subset.isin(chosen)]
-                model = fit(pd.concat([base, added[["text", "label", "subset"]]], ignore_index=True))
+                model = fit(pd.concat([base_train, added[["text", "label", "subset"]]], ignore_index=True))
                 result = score_block(model.predict_proba(test.text), test.label, test.text,
                                      _threshold(model, val_benign))
-            rows.append(dict(k=k, draw=draw, k_used=k_used, **result))
+            rows.append(dict(k=k, draw=draw, k_used=k_used, **result,
+                             base_auroc=baseline["auroc"], base_binned_auroc=baseline["binned_auroc"]))
     return pd.DataFrame(rows)
 
 

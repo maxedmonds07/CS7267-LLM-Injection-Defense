@@ -89,3 +89,12 @@ def test_score_block_binned_nan_on_tiny_set():
     out = score_block(scores, labels, ["x" * i for i in range(10)], threshold=0.5)
     assert np.isnan(out["binned_auroc"]) and np.isfinite(out["auroc"])
     assert out["recall"] == 0.6 and out["fpr"] == 0.4
+
+
+def test_few_shot_scores_the_k0_model_on_each_rows_test_servers():
+    data, mcp, _ = synth()
+    out = few_shot(data, mcp, Spy(), ks=(0, 2), draws=3, seed=1)
+    k2 = out[out.k == 2]
+    assert k2.base_auroc.notna().all() and k2.base_auroc.nunique() > 1  # differs by draw
+    k0 = out[out.k == 0]
+    assert (k0.base_auroc == k0.auroc).all()

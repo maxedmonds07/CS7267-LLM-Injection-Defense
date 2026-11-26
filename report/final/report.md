@@ -26,10 +26,10 @@ abstract: |
   longer than benign descriptions, so it ranks MCP rows by inverse length. It is also the most brittle model: leetspeak cuts its recall
   from 0.984 to 0.110. False alarms fall on long benign tool documentation (14.3% false-positive
   rate on the longest quarter against a 1% target). We release the code, a model card, and a
-  harm-by-harm mitigation plan. The highest in-distribution score did not predict transfer; data
-  from the surface did. In a follow-up outside the pre-registered protocol, adding the tool
-  descriptions of two MCPTox servers to training lifts the TF-IDF model from 0.767 to 0.966 AUROC
-  on the remaining servers.
+  harm-by-harm mitigation plan. The highest in-distribution score did not predict transfer. In a
+  follow-up outside the pre-registered protocol, data from the surface helped the TF-IDF model:
+  adding the tool descriptions of two MCPTox servers to its training lifts its AUROC on the
+  remaining servers from 0.764 to 0.966 (median of ten server draws).
 documentclass: article
 numbersections: true
 colorlinks: true
@@ -295,8 +295,9 @@ B1-Optuna improves on B1 (0.922 vs 0.902, above B1's interval), and both rank by
 (length-binned AUROC 0.989 ± 0.003 and 0.918). Length and perplexity are near chance.
 
 **On MCP tool descriptions the order reverses.** B1-Optuna is the strongest trained detector by raw AUROC but
-only ties raw length, with overlapping intervals (paired server bootstrap of the difference:
-−0.007, 95% interval −0.105 to +0.099; Appendix \ref{app:followup}); its length-binned AUROC of 0.725 shows that it
+only ties raw length, with overlapping intervals (in a follow-up outside the pre-registered
+protocol, a paired server bootstrap gives a difference of −0.007, 95% interval −0.105 to +0.099;
+Appendix \ref{app:followup}); its length-binned AUROC of 0.725 shows that it
 does rank within texts of similar length, so it is a weak detector rather than a length proxy.
 B2 and B0 fall *below chance* by raw AUROC, but B0 has the highest length-binned AUROC in the
 table (0.739): within texts of similar length it ranks attacks above benign rows, and only the
@@ -446,12 +447,14 @@ the top-attributed tokens are *your*, *response*, *reply* and *in*: two very dif
 learned the same cue from BIPIA. On MCPTox, attacks and benign descriptions have the same median
 logit, attribution falls on formatting tokens, and even "you MUST first use" pushes toward
 benign (Figure \ref{fig:saliency}). Across all three seeds B2 scores 98–100% of MCPTox rows below 0.01. Its below-chance
-AUROC is not a confident inversion, but it is not noise either: among these near-zero scores B2
+AUROC is not a confident inversion, but a follow-up outside the pre-registered protocol shows it
+is not noise either: among these near-zero scores B2
 rates longer text as more benign, a habit PoisonedRAG's short poisoned passages would teach, and
 MCP attacks are longer than benign descriptions. **B2 does not respond to the surface's
 phrasing; it ranks MCP rows by inverse length.** Its score falls with length on MCPTox (Spearman
 −0.45, −0.77 and −0.73 by seed; −0.57 to −0.85 among benign rows alone), as it does among
-in-distribution benign rows (seed 7268: −0.53 on BIPIA, −0.83 on PoisonedRAG). Dropping the 241
+in-distribution PoisonedRAG benign rows on every seed (−0.82 to −0.84); on BIPIA the sign varies
+by seed. Dropping the 241
 benign descriptions shorter than the shortest attack (133 characters) lifts its AUROC to 0.727,
 0.595 and 0.616 (Appendix \ref{app:followup}).
 
@@ -563,11 +566,13 @@ perfectly, ranks MCP tool descriptions by inverse length, and is the easiest to 
 this: the paired model moves toward chance, not above it. We would deploy B1-Optuna, as documented in
 its model card, only on validated surfaces (not on MCP tool descriptions, where it catches 35% of
 attacks at 6.9% FPR), with input normalization, per-surface thresholds,
-review rather than automatic blocking, and architectural defenses around it. The bottleneck is
-data, not the model: refitting B1-Optuna with the descriptions of two MCPTox servers lifts its
-AUROC on the other 43 from 0.767 to 0.966 (length-binned 0.725 → 0.953; median of ten draws), and
-training on MSB's 91 tool descriptions alone reaches 0.859 on MCPTox, above length (Appendix
-\ref{app:followup}). Both are follow-up analyses within two benchmarks; the next step is benign and
+review rather than automatic blocking, and architectural defenses around it. Data from the
+surface helped where a larger model did not. In follow-up analyses outside the pre-registered
+protocol, refitting B1-Optuna with the descriptions of two MCPTox servers lifts its AUROC on the
+other 43 from 0.764 to 0.966 (length-binned 0.724 → 0.953; medians over ten server draws, each
+compared on the same servers), and training on MSB's 91 tool descriptions alone reaches 0.859 on
+MCPTox, above length (Appendix \ref{app:followup}). We did not give DeBERTa the same data, and
+both results come from two benchmarks; the next step is benign and
 adversarial tool descriptions from a source other than MCPTox, with MCPTox kept as the held-out
 test.
 
@@ -651,8 +656,9 @@ information.
 
 **Is the bottleneck data?** We refit B1-Optuna, with its committed settings, on the training
 split plus every description of $k$ randomly drawn MCPTox servers and test on the remaining
-servers (ten draws per $k$; the threshold stays at 1% FPR on in-distribution validation). Two
-servers lift AUROC from 0.767 to 0.966 and length-binned AUROC from 0.725 to 0.953; recall at the
+servers (ten draws per $k$; the threshold stays at 1% FPR on in-distribution validation). On the
+same held-out servers, two added servers lift AUROC from 0.764 to 0.966 and length-binned AUROC
+from 0.724 to 0.953 (medians; the paired lift is positive in every draw, +0.07 to +0.22); recall at the
 deployed threshold rises from 0.348 to 0.886 while FPR stays near 6% (Figure \ref{fig:fewshot}).
 
 ![B1-Optuna on held-out MCPTox servers after adding $k$ servers to training: median and interquartile range over ten server draws. $k=0$ is the pre-registered result.](../followup/few_shot.png){#fig:fewshot width=70%}
@@ -663,7 +669,7 @@ deployed threshold rises from 0.348 to 0.886 while FPR stays near 6% (Figure \re
 | MCPTox, other two templates and other servers | one template's attacks (3 folds) | 0.996 | 0.997 | 1.000 | 0.370 |
 | MSB (70 attacks, 21 benign) | all of MCPTox | 0.859 | 0.762 | 0.942 | 0.453 |
 
-Table: B1-Optuna trained on tool descriptions. Out-of-fold scores are pooled; the threshold is 1% FPR on each fold's training benign rows, which the model fits too closely to carry over (hence the high FPR). Folds never share a server. {#tbl:insurface}
+Table: B1-Optuna trained on tool descriptions. Out-of-fold scores from separately fitted fold models are pooled into one AUROC; the threshold is 1% FPR on each fold's training benign rows, which the model fits too closely to carry over, so recall at these FPRs says little. Folds never share a server. {#tbl:insurface}
 
 **How learnable is the surface?** Inside MCPTox the surface is close to separable, even for a
 template the model never saw (Table \ref{tbl:insurface}), so the detector learns more than the
