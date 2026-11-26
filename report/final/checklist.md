@@ -32,7 +32,7 @@ reproducibility checklist. Section numbers refer to this paper.
 \item {\bf Open access to data and code}
     \item[] Question: Does the paper provide open access to the data and code, with sufficient instructions to faithfully reproduce the main experimental results, as described in supplemental material?
     \item[] Answer: \answerYes{}
-    \item[] Justification: The code, configuration, the B2 training notebook, the result tables and per-row scores of every detector are in the public repository (\url{https://github.com/maxedmonds07/CS7267-LLM-Injection-Defense}), with instructions in its README and Appendix~\ref{app:reproduce}. Access is partial in one respect: the rebuilt dataset, the B2 Colab score files and the B2 checkpoint sit in a team-only DVC remote, because some upstream sources forbid redistribution. Outside readers rebuild the dataset with the DVC pipeline from upstream repositories pinned to exact commits (NewsQA must be built under its own terms) and retrain B2 with the notebook (Section~\ref{sec:data}, Appendix~\ref{app:reproduce}).
+    \item[] Justification: The code, configuration, the B2 and B4 training notebooks, the result tables and per-row scores of every detector are in the public repository (\url{https://github.com/maxedmonds07/CS7267-LLM-Injection-Defense}), with instructions in its README and Appendix~\ref{app:reproduce}. Access is partial in one respect: the rebuilt dataset, the B2 Colab score files and the B2 checkpoint sit in a team-only DVC remote, because some upstream sources forbid redistribution. Outside readers rebuild the dataset with the DVC pipeline from upstream repositories pinned to exact commits (NewsQA must be built under its own terms) and retrain B2 with the notebook (Section~\ref{sec:data}, Appendix~\ref{app:reproduce}).
 
 \item {\bf Experimental setting/details}
     \item[] Question: Does the paper specify all the training and test details (e.g., data splits, hyperparameters, how they were chosen, type of optimizer, etc.) necessary to understand the results?
@@ -42,12 +42,12 @@ reproducibility checklist. Section numbers refer to this paper.
 \item {\bf Experiment statistical significance}
     \item[] Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments?
     \item[] Answer: \answerYes{}
-    \item[] Justification: AUROC carries 95\% percentile-bootstrap intervals that resample whole groups (so BIPIA twin pairs never split); FPR carries Wilson 95\% intervals; B2 is reported as mean $\pm$ standard deviation over three seeds, with per-seed intervals for the pre-registered criterion (Section~\ref{sec:method}, Tables~\ref{tbl:main}, \ref{tbl:verdict}, \ref{tbl:fairness}). Small groups (MSB, CJK rows) are flagged as indicative.
+    \item[] Justification: AUROC carries 95\% percentile-bootstrap intervals that resample whole groups (so BIPIA twin pairs never split); FPR carries Wilson 95\% intervals; B2 and B4 are reported as mean $\pm$ standard deviation over three seeds, with per-seed intervals for B2's pre-registered criterion (Section~\ref{sec:method}, Tables~\ref{tbl:main}, \ref{tbl:verdict}, \ref{tbl:b4}, \ref{tbl:fairness}). Small groups (MSB, CJK rows) are flagged as indicative.
 
 \item {\bf Experiments compute resources}
     \item[] Question: For each experiment, does the paper provide sufficient information on the computer resources (type of compute workers, memory, time of execution) needed to reproduce the experiments?
     \item[] Answer: \answerYes{}
-    \item[] Justification: Table~\ref{tbl:cost} and Section~\ref{sec:deploy} give inference time per row on an Apple M4 Max laptop (CPU and GPU), fit times, the 55-minute Optuna search on one CPU core, and the B2 runs on a Colab T4. B2's training time was not recorded; the paper gives the run plan's estimate (6--9 GPU-hours) and labels it as one.
+    \item[] Justification: Table~\ref{tbl:cost} and Section~\ref{sec:deploy} give inference time per row on an Apple M4 Max laptop (CPU and GPU), fit times, the 55-minute Optuna search on one CPU core, and the B2 runs on a Colab T4. B2's training time was not recorded; the paper gives the run plan's estimate (6--9 GPU-hours) and labels it as one. B4's twelve fine-tunes ran on a Colab GPU in two independent runs; each grid took 3.5--3.7 GPU-hours to train (one teammate-reported, one from output-file timestamps), plus about 0.5 GPU-hours to score.
 
 \item {\bf Code of ethics}
     \item[] Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics \url{https://neurips.cc/public/EthicsGuidelines}?
@@ -87,7 +87,7 @@ reproducibility checklist. Section numbers refer to this paper.
 \item {\bf Declaration of LLM usage}
     \item[] Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does not impact the core methodology, scientific rigorousness, or originality of the research, declaration is not required.
     \item[] Answer: \answerYes{}
-    \item[] Justification: Language models are components of two detectors (DistilGPT2 in B0, DeBERTa-v3 in B2; Section~\ref{sec:method}). An AI assistant wrote parts of the code and the error codebook and made the codebook's 40-row agreement check (Section~\ref{sec:taxonomy}); this is declared in Section~\ref{sec:conclusion}.
+    \item[] Justification: Language models are components of three detectors (DistilGPT2 in B0, DeBERTa-v3 in B2 and B4; Section~\ref{sec:method}). An AI assistant wrote parts of the code and the error codebook and made the codebook's 40-row agreement check (Section~\ref{sec:taxonomy}); this is declared in Section~\ref{sec:conclusion}.
 
 \end{enumerate}
 ```

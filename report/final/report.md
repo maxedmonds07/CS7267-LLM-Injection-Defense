@@ -3,7 +3,7 @@ title: "Detecting Prompt Injection Across RAG and MCP Surfaces: Detectors Learn 
 author: |
   ```{=latex}
   Carter Corbin\qquad Max Edmonds\qquad Mohammed Adil Ahmed\\
-  Oluwamayowa Adewummi\qquad Adedapo Odeyemi\\[0.4em]
+  \textbf{Oluwamayowa Adewummi\qquad Adedapo Odeyemi}\\[0.4em]
   College of Computing and Software Engineering, Kennesaw State University, Kennesaw, GA\\
   \url{https://github.com/maxedmonds07/CS7267-LLM-Injection-Defense}
   ```
@@ -16,6 +16,7 @@ abstract: |
   fine-tuned DeBERTa-v3 on RAG passages and tool outputs, and hold out MCP tool descriptions
   entirely. In distribution the trained detectors reach 0.90–0.99 AUROC; on MCP tool descriptions the
   best of them only ties text length (0.767 vs 0.774) and DeBERTa falls below chance (0.346).
+  Letting DeBERTa read the user's task alongside the text lifts it only to about chance (0.45–0.51).
   An error taxonomy, exact SHAP values and integrated gradients explain why: both trained models
   learned the *voice* of the training attacks, second-person phrasing about the model's
   response ("in your response", "reply"); the word *your* alone appears in 44.5% of
@@ -68,8 +69,9 @@ Our contributions are:
   reference that every detector must beat.
 - **Three detector families** under one harness at a deployed 1% false-positive threshold
   (§\ref{sec:method}), including a TF-IDF model tuned on family-grouped folds and a fine-tuned
-  DeBERTa-v3 with a pre-registered success criterion. The trained detectors fit their training
-  surfaces; none transfers (§\ref{sec:results}).
+  DeBERTa-v3 with a pre-registered success criterion, plus a DeBERTa variant that reads the
+  user's task with each text. The trained detectors fit their training surfaces; none transfers
+  (§\ref{sec:results}).
 - **An explanation of the failure** (§\ref{sec:why}): a rule-based failure taxonomy, exact SHAP
   values and integrated gradients show that the trained detectors key on the second-person voice
   of the training attacks, while MCP attacks are written as tool procedure.
@@ -247,6 +249,19 @@ loss; + pairwise loss trained on BIPIA only) were trained with three seeds each 
 (learning rate 2e-5, batch 16, 3 epochs). Row 2 (pairwise loss, both sources) was selected on
 validation.
 
+**B4: DeBERTa that reads the task.** B2 sees only the candidate text, so it cannot tell whether
+an instruction belongs to what the user asked for. B4 pairs each candidate with trusted task
+context: the original question for PoisonedRAG and BIPIA (code and error text, or a fixed
+summarization instruction, for BIPIA's code and abstract tasks), and for MCPTox and MSB the
+server's catalogue of legitimate user tasks, a proxy for an individual request. DeBERTa-v3-base
+reads up to 128 task tokens with each 256-token candidate window, without B2's pairwise loss.
+Four configurations isolate each change: the candidate alone (`text`), the task and candidate
+together (`pair`), the pair plus two lexical relevance features, character TF-IDF cosine and
+task-word coverage (`relevance`), and `relevance` trained on BIPIA only. Each was trained with
+three seeds under B2's settings, and `relevance` was selected on validation. Holdout rows with no
+task context (175 of 847 on MCPTox, 15 of 91 on MSB) are excluded, so B4 is compared with length
+and B1 refitted on the same rows rather than with Table \ref{tbl:main}.
+
 **Protocol.** One harness scores every detector. The **deployed threshold** is the score that
 gives 1% FPR on the validation split's benign rows, applied unchanged to every eval set. We
 report AUROC with a 95% bootstrap interval that resamples whole groups [@efron1993introduction];
@@ -298,6 +313,29 @@ Removing PoisonedRAG from B2's training, which we expected to help by removing i
 length cue, makes MCPTox *worse* (0.346 → 0.199): more varied training text helps more than a
 cleaner length signal. Across all nine B2 runs, test AUROC is 0.92–0.997 and MCPTox AUROC
 0.147–0.491. The ordering on the unseen surface is the reverse of capacity.
+
+| Detector (B4 rows) | Test AUROC | MCPTox AUROC | binned | MSB | MCPTox TPR at 5% FPR |
+|:-----------------|:---------------|:---------------|:---------------|:---------------|:---------------|
+| Length only | 0.491 | 0.760 | 0.472 | 0.907 | 0.002 |
+| B1 TF-IDF | 0.902 | 0.700 | 0.710 | 0.481 | 0.181 |
+| B4 `text` | 0.993 ± 0.002 | 0.339 ± 0.049 | 0.672 ± 0.070 | 0.160 ± 0.022 | 0.019 ± 0.014 |
+| B4 `pair` | 0.991 ± 0.002 | 0.506 ± 0.012 | 0.455 ± 0.021 | 0.335 ± 0.151 | 0.044 ± 0.050 |
+| B4 `relevance` | 0.990 ± 0.002 | 0.454 ± 0.099 | 0.486 ± 0.105 | 0.257 ± 0.084 | 0.012 ± 0.011 |
+| B4 `relevance`, BIPIA only | 0.927 ± 0.008 | 0.397 ± 0.061 | 0.520 ± 0.119 | 0.175 ± 0.065 | 0.032 ± 0.014 |
+
+Table: B4 on the rows that have task context. Test: 827 benign / 607 adversarial; MCPTox: 269 / 403 (of 362 / 485); MSB: 21 / 55 (of 21 / 70). Length and B1 were refitted once on these rows; B4: mean ± SD over three seeds. *binned*: MCPTox length-binned AUROC. `relevance` was selected on validation. {#tbl:b4}
+
+**Reading the task does not make DeBERTa transfer** (Table \ref{tbl:b4}). Every B4 configuration
+fits in distribution and stays below chance on both holdouts, where length alone scores 0.760 and
+0.907 on the same rows. Adding the task (`text` → `pair`) raises MCPTox AUROC from 0.339 to 0.506
+on every seed, but its length-binned AUROC falls from 0.672 to 0.455 and TPR at matched 5% FPR
+stays below 0.05: the model becomes less wrong, not a detector. The relevance features, the
+change B4 was built to test, lower MCPTox AUROC to 0.454 (two of three seeds) and MSB AUROC on
+every seed. Training on BIPIA only again makes MCPTox worse (0.454 → 0.397), as it did for B2.
+Validation cannot choose among these: three configurations reach validation TPR of at least 0.998
+at 1% FPR. A second, independent run of all twelve fine-tunes reached the same conclusions,
+although single-seed holdout AUROC moved by up to 0.21 between runs because GPU training is not
+bit-for-bit reproducible.
 
 # Why the Detectors Fail {#sec:why}
 
@@ -444,7 +482,7 @@ Table: Error rates by group at the deployed threshold (target FPR 1%). Length qu
 scores a text in **0.58 ms** on one CPU core with 377,215 weights; B2 takes 56.2 ms on the same
 CPU and 44.0 ms on the laptop GPU, with 184.4 M parameters; B0 takes 57.6 ms. B1-Optuna's whole
 search took 55 minutes on a CPU and its refit 7 seconds; B2's nine runs and sweeps took an
-estimated 6–9 T4 GPU-hours (run times were not recorded). The detector that transfers best is also
+estimated 6–9 T4 GPU-hours (run times were not recorded). Each full B4 grid of twelve fine-tunes took 3.5–3.7 Colab GPU-hours to train, 15–20 minutes per run, in two independent runs. The detector that transfers best is also
 about 100 times cheaper. B2's near-zero MCPTox FPR is not fairness: it flags almost nothing there,
 attack or benign.
 
@@ -476,8 +514,10 @@ Cyrillic look-alikes nor digits to Latin letters. Normalization is necessary, no
 
 # Limitations and Conclusion {#sec:conclusion}
 
-**Limitations.** We explain frozen detectors and cannot test fixes that need retraining, above
-all adding tool descriptions to training. The holdouts are small (MSB has 21 benign rows) and
+**Limitations.** We explain frozen detectors. The one retrained variant, B4, adds task context,
+not new data, so we could not test the fix we recommend: adding tool descriptions to training.
+B4's MCP task context is a server-level catalogue rather than an observed request, and it
+excludes holdout rows without one. The holdouts are small (MSB has 21 benign rows) and
 come from single benchmarks. B2's search covered two values of one hyperparameter, its seeds
 disagree widely on MCPTox (0.247–0.491), and its robustness, saliency and latency results use one
 seed. The error codebook was validated by its author, an AI assistant, not by independent human
@@ -490,7 +530,8 @@ key on second-person phrasing about the model's response, the way BIPIA's attack
 MCP attacks are written as tool procedure, a phrasing the training data almost never contains,
 and benign tool documentation that happens to say "in your account" is flagged. More capacity
 made this worse, not better: DeBERTa fits its training surfaces almost perfectly, does not
-respond to the new one, and is the easiest to evade. We would deploy B1-Optuna, as documented in
+respond to the new one, and is the easiest to evade. Letting it read the user's task does not fix
+this: the paired model moves toward chance, not above it. We would deploy B1-Optuna, as documented in
 its model card, only on validated surfaces, with input normalization, per-surface thresholds,
 review rather than automatic blocking, and architectural defenses around it. The next step is not
 a larger model but different data: benign and adversarial tool descriptions from a source other
@@ -510,7 +551,7 @@ repository; the PR numbers below refer to it.
 
 | Member | Method developed and its code | Phase | Used in |
 |:------------------|:-----------------------------------------------------------|:------|:--------|
-| Mohammed Adil Ahmed | B0 perplexity and B1 TF-IDF detectors and MLflow experiment tracking (`src/models/perplexity.py`, `src/models/tfidf.py`, `mlflow-server/`; PRs #5, #22) | 3–4 | §§4–5 |
+| Mohammed Adil Ahmed | B0 perplexity and B1 TF-IDF detectors and MLflow experiment tracking (`src/models/perplexity.py`, `src/models/tfidf.py`, `mlflow-server/`; PRs #5, #22); B4 task-paired DeBERTa and its Colab experiment grid (`src/models/b4*.py`, `src/data/b4_data.py`, `notebooks/b4_colab.ipynb`; PR #53) | 3–4, 6 | §§4–5 |
 | Carter Corbin | Length-shortcut gate, probe figures and the red-team mutation generator (`notebooks/phase3_probe_figures.py` and the red-team stage; PR #40) | 3 | §§3, 7 |
 | Max Edmonds | Visual profile of the unified corpus (`notebooks/phase3_eda.py`; PRs #20, #26); DeBERTa score guards and gradient clipping (`src/models/deberta.py`, `src/models/precomputed.py`; PR #39); the B2 training runs and verdict (PR #43) | 3–4 | §§3, 5 |
 | Oluwamayowa Adewummi | Family-grouped cross-validation of B1 with 95% intervals and length-binned AUROC (`src/eval/b1_tfidf_lr.py`; PR #46) | 4 | §4 |
@@ -527,8 +568,10 @@ Table: The method each team member developed and coded, the project phases it be
 
 # Reproducing the Results {#app:reproduce}
 
-Every number in this paper is produced by a committed script with a `make` target; the PDF is
-built by `make report-final`. The rebuilt dataset, the B2 score files and the B2 checkpoint are
+Every number in this paper is produced by a committed script with a `make` target, except B4's;
+the PDF is built by `make report-final`. B4's twelve fine-tunes run in `notebooks/b4_colab.ipynb`
+on a Colab GPU, and Table \ref{tbl:b4} is read from its committed result files in `report/b4/`
+(setup in `docs/b4-relevance.md`). The rebuilt dataset, the B2 score files and the B2 checkpoint are
 versioned with DVC in a team-only remote, so `make data`, `make b2-report` and `make b2-checkpoint`
 need its credentials. Outside readers can rebuild the dataset with `dvc repro` from the pinned
 public upstream sources (NewsQA must first be built under its own terms), retrain B2 with the
