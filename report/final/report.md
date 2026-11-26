@@ -482,7 +482,7 @@ Table: Error rates by group at the deployed threshold (target FPR 1%). Length qu
 scores a text in **0.58 ms** on one CPU core with 377,215 weights; B2 takes 56.2 ms on the same
 CPU and 44.0 ms on the laptop GPU, with 184.4 M parameters; B0 takes 57.6 ms. B1-Optuna's whole
 search took 55 minutes on a CPU and its refit 7 seconds; B2's nine runs and sweeps took an
-estimated 6–9 T4 GPU-hours (run times were not recorded). The detector that transfers best is also
+estimated 6–9 T4 GPU-hours (run times were not recorded). Each full B4 grid of twelve fine-tunes took 3.5–3.7 Colab GPU-hours to train, 15–20 minutes per run, in two independent runs. The detector that transfers best is also
 about 100 times cheaper. B2's near-zero MCPTox FPR is not fairness: it flags almost nothing there,
 attack or benign.
 

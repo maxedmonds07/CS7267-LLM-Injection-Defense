@@ -47,7 +47,7 @@ reproducibility checklist. Section numbers refer to this paper.
 \item {\bf Experiments compute resources}
     \item[] Question: For each experiment, does the paper provide sufficient information on the computer resources (type of compute workers, memory, time of execution) needed to reproduce the experiments?
     \item[] Answer: \answerYes{}
-    \item[] Justification: Table~\ref{tbl:cost} and Section~\ref{sec:deploy} give inference time per row on an Apple M4 Max laptop (CPU and GPU), fit times, the 55-minute Optuna search on one CPU core, and the B2 runs on a Colab T4. B2's training time was not recorded; the paper gives the run plan's estimate (6--9 GPU-hours) and labels it as one. B4's twelve fine-tunes also ran on a Colab GPU; their training time was not recorded.
+    \item[] Justification: Table~\ref{tbl:cost} and Section~\ref{sec:deploy} give inference time per row on an Apple M4 Max laptop (CPU and GPU), fit times, the 55-minute Optuna search on one CPU core, and the B2 runs on a Colab T4. B2's training time was not recorded; the paper gives the run plan's estimate (6--9 GPU-hours) and labels it as one. B4's twelve fine-tunes ran on a Colab GPU in two independent runs; each grid took 3.5--3.7 GPU-hours to train (one teammate-reported, one from output-file timestamps), plus about 0.5 GPU-hours to score.
 
 \item {\bf Code of ethics}
     \item[] Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics \url{https://neurips.cc/public/EthicsGuidelines}?
