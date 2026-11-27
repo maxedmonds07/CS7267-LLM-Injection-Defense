@@ -139,7 +139,8 @@ fine-tunes a pretrained encoder and argues that detectors must be judged at very
 false-positive rates [@jacob2025promptshield], and InjecGuard shows that such guardrails
 *over-defend*, flagging benign text that contains trigger words common in attacks
 [@li2024injecguard], the failure we observe on benign tool documentation (§\ref{sec:shap}). Our
-B1 and B2 belong to this family. *LLM-based detectors* use a language model as the judge;
+B1 and B2 belong to this family, as does Meta's public Prompt Guard 2 [@meta2025promptguard2],
+which we score zero-shot in a follow-up (Appendix \ref{app:followup}). *LLM-based detectors* use a language model as the judge;
 DataSentinel fine-tunes one in a minimax game against adaptive attacks [@liu2025datasentinel].
 *Internal-signal detectors* read the protected model's own state: Attention Tracker flags inputs
 that pull specific attention heads away from the original instruction [@hung2025attention], and
@@ -550,8 +551,8 @@ B4's MCP task context is a server-level catalogue rather than an observed reques
 excludes holdout rows without one. The holdouts are small (MSB has 21 benign rows) and
 come from single benchmarks, so a shift of surface is also a shift of benchmark authors; MCPTox's
 485 attacks come from three templates (77, 183 and 225 rows), so its holdout tests three
-phrasings, not the surface at large. We trained every detector we report: no off-the-shelf
-detector or LLM-judge baseline was scored. Wilson intervals treat rows as independent, although
+phrasings, not the surface at large. The one off-the-shelf detector, Prompt Guard 2, was scored
+after the pre-registered evaluation, and no LLM-judge baseline was scored. Wilson intervals treat rows as independent, although
 tool descriptions cluster by server. B2's search covered two values of one hyperparameter, its seeds
 disagree widely on MCPTox (0.247–0.491), and its robustness, saliency and latency results use one
 seed. The error codebook was written after reading holdout errors and validated by its author, an AI
@@ -574,7 +575,10 @@ pre-registered protocol, refitting B1-Optuna with the descriptions of two MCPTox
 AUROC on the other 43 from 0.764 to 0.966 (length-binned 0.724 → 0.953; medians over ten server
 draws, each compared on the same servers; single draws 0.835–0.976), although FPR stays at 5–9%
 against the 1% target. Training on MSB's 91 tool descriptions alone is a modest gain
-(length-binned 0.762 against 0.725; Appendix \ref{app:followup}). We did not give DeBERTa the same data, and
+(length-binned 0.762 against 0.725; Appendix \ref{app:followup}). A public detector trained on
+more injection data, Prompt Guard 2, ranks MCPTox better within length bins than any detector we
+trained (0.879), but its lead over raw length is not significant across servers, and at its own
+cut it flags 1.4% of attacks. We did not give DeBERTa the same data, and
 both results come from two benchmarks; the next step is benign and
 adversarial tool descriptions from a source other than MCPTox, with MCPTox kept as the held-out
 test.
@@ -681,6 +685,36 @@ learns MCPTox's generation style, which every template shares, rather than injec
 descriptions at large, so we claim the data result for MCPTox only. A different source helps only
 modestly: trained only on MSB, the model reaches 0.859 on MCPTox, but its length-binned AUROC is
 0.762 against the base model's 0.725, at 45% FPR, with a threshold that 21 benign rows cannot set.
+
+**An off-the-shelf detector.** We scored Meta's Prompt Guard 2 (86M) [@meta2025promptguard2]
+zero-shot, with no training on our data (`scripts/prompt_guard_colab.py`; `make followup-offshelf`).
+Long texts are scored like B2, in overlapping 512-token windows with the highest window as the
+text's score; scoring only the first window changes nothing that matters (BIPIA test AUROC 0.628
+against 0.630). The model was released in April 2025, before MCPTox and MSB, so it is unlikely to
+have seen either; its training mix includes public injection data, so BIPIA overlap cannot be
+ruled out.
+
+| Detector | MCPTox AUROC | binned | Recall | FPR | Test AUROC |
+|:-----------------|:---------------|------:|------:|------:|------:|
+| Length only | 0.774 [0.738, 0.814] | 0.531 | 0.000 | 0.000 | 0.491 |
+| B1-Optuna | 0.767 [0.736, 0.800] | 0.725 | 0.348 | 0.069 | 0.922 |
+| Prompt Guard 2, our threshold | 0.819 [0.789, 0.848] | 0.879 | 0.138 | 0.022 | 0.571 |
+| Prompt Guard 2, its 0.5 cut | | | 0.014 | 0.003 | |
+
+Table: Prompt Guard 2 zero-shot on MCPTox (362 benign / 485 attacks). *Our threshold*: 1% FPR on in-distribution validation, as for every detector in Table \ref{tbl:main}; *its 0.5 cut*: the model's default decision rule. {#tbl:offshelf}
+
+Prompt Guard 2 ranks MCPTox attacks better within length bins than any detector we trained
+(Table \ref{tbl:offshelf}), so it is not leaning on length the way DeBERTa does. Its lead over raw
+length is not significant: a paired bootstrap over the 45 servers gives +0.045 (95% interval
+−0.073 to +0.164), and +0.051 (−0.024 to +0.131) over B1-Optuna. It cannot be deployed there
+either. Its scores are tiny (median 0.0016 for attacks, 0.0007 for benign descriptions), so at its
+own 0.5 cut it flags 1.4% of MCPTox attacks, and even our threshold, set on in-distribution
+validation, catches 14%. In distribution it is weak (test AUROC 0.571): it ranks BIPIA's
+instructions above benign text (0.813 on instruction attacks) but PoisonedRAG's false passages
+below it (0.174 on poisoning), which fits a model that flags text trying to direct the model,
+not text that only misinforms it. A detector trained on more, and more varied, injection data
+ranks this surface better than ours, which agrees with the data result above; no threshold set
+off the surface carries over to it.
 
 # Model Card {#app:card}
 
