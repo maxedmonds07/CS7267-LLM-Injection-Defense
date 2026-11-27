@@ -15,7 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from harness import Data  # noqa: E402
 from precomputed import PrecomputedScores  # noqa: E402
 from prompt_guard_colab import (  # noqa: E402
-    NAME, PromptGuardDetector, check_two_class, max_by_owner, native_summary, score_file, windows,
+    NAME, PromptGuardDetector, malicious_index, max_by_owner, max_pool_scores, native_summary, score_file,
+    windows,
 )
 
 
@@ -46,23 +47,57 @@ def test_predict_proba_batches():
     assert stub.calls == 3 and len(scores) == 10
 
 
+def wrap(ids):
+    return [0, *ids, 2]  # [CLS] ids [SEP]
+
+
 def test_windows_cover_long_texts_and_keep_short_ones_whole():
-    out, owners = windows([list(range(5)), list(range(1000))], chunk_tokens=510, stride=384)
-    assert out[0] == list(range(5)) and owners[0] == 0
-    long = [w for w, o in zip(out, owners) if o == 1]
+    out, owners, multi = windows([list(range(5)), list(range(1000))], wrap, chunk_tokens=510, stride=384)
+    assert out[0] == wrap(list(range(5))) and owners[0] == 0 and multi == 1
+    long = [w[1:-1] for w, o in zip(out, owners) if o == 1]
     assert len(long) == 3 and all(len(w) == 510 for w in long)
     assert set().union(*map(set, long)) == set(range(1000))  # an injection at the end is still scored
     assert long[-1][-1] == 999
+
+
+def window_scorer(batch):
+    """A window is 'malicious' exactly when it contains token 99."""
+    return [1.0 if 99 in w else 0.1 for w in batch]
+
+
+def test_max_pool_finds_an_injection_past_the_first_window():
+    late = [1] * 30 + [99]  # token 99 sits after the first 10-token window
+    scores, multi = max_pool_scores([late, [1, 3]], window_scorer, wrap, chunk_tokens=10, stride=8)
+    assert scores.tolist() == [1.0, 0.1] and multi == 1
+
+
+def test_truncate_scores_only_the_first_window():
+    late = [1] * 30 + [99]
+    scores, multi = max_pool_scores([late], window_scorer, wrap, chunk_tokens=10, stride=8, truncate=True)
+    assert scores.tolist() == [0.1] and multi == 1  # still counted: truncation cut it
+
+
+def test_max_pool_wraps_windows_in_special_tokens_and_respects_the_window_batch():
+    seen = []
+
+    def spy(batch):
+        seen.append(batch)
+        return [0.5] * len(batch)
+
+    max_pool_scores([[5] * 25], spy, wrap, chunk_tokens=10, stride=10, window_batch=2)
+    assert [len(b) for b in seen] == [2, 1]
+    assert all(w[0] == 0 and w[-1] == 2 and len(w) == 12 for b in seen for w in b)
 
 
 def test_max_by_owner_keeps_each_texts_highest_window():
     np.testing.assert_allclose(max_by_owner([0.1, 0.9, 0.2, 0.3], [0, 0, 1, 1], 2), [0.9, 0.3])
 
 
-def test_check_two_class_rejects_a_three_class_model():
-    check_two_class(SimpleNamespace(num_labels=2))
+def test_malicious_index_finds_the_label_and_refuses_a_three_class_model():
+    assert malicious_index({0: "LABEL_0", 1: "LABEL_1"}) == 1
+    assert malicious_index({"0": "MALICIOUS", "1": "BENIGN"}) == 0
     with pytest.raises(ValueError, match="2 classes"):
-        check_two_class(SimpleNamespace(num_labels=3))  # Prompt Guard 1: last index is jailbreak only
+        malicious_index({0: "benign", 1: "injection", 2: "jailbreak"})  # Prompt Guard 1
 
 
 def test_score_file_is_named_apart_from_the_deberta_runs(tmp_path):
@@ -98,3 +133,15 @@ def test_native_summary_reports_the_off_the_shelf_cut_and_exposure():
     assert out.loc["val", "recall_at_0.5"] == 0.5 and out.loc["val", "fpr_at_0.5"] == 0.5
     assert out.loc["mcptox", "recall_at_0.5"] == 0.5 and out.loc["mcptox", "fpr_at_0.5"] == 0.0
     assert out.loc["test", "exposure"] == "unknown" and out.loc["mcptox", "chunked"] == 0
+    assert not out["truncate"].any()
+
+
+def test_truncated_run_is_named_and_written_apart(tmp_path):
+    stub = Stub()
+    stub.truncate = True
+    path = tmp_path / "prompt-guard-2-truncated.parquet"
+    score_file(PromptGuardDetector(scorer=stub, batch_size=4), data(), path)
+    meta = json.loads(pq.read_schema(path).metadata[b"deberta"])
+    assert PrecomputedScores(path).name == f"{NAME}_truncated" and meta["truncate"] is True
+    native = pd.read_csv(tmp_path / "prompt-guard-2-truncated_native.csv")
+    assert native["truncate"].all()
