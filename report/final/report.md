@@ -27,9 +27,10 @@ abstract: |
   from 0.984 to 0.110. False alarms fall on long benign tool documentation (14.3% false-positive
   rate on the longest quarter against a 1% target). We release the code, a model card, and a
   harm-by-harm mitigation plan. The highest in-distribution score did not predict transfer. In a
-  follow-up outside the pre-registered protocol, data from the surface helped the TF-IDF model:
-  adding the tool descriptions of two MCPTox servers to its training lifts its AUROC on the
-  remaining servers from 0.764 to 0.966 (median of ten server draws).
+  follow-up outside the pre-registered protocol, data from the surface helped the TF-IDF model on
+  MCPTox: adding the tool descriptions of two MCPTox servers to its training lifts its AUROC on the
+  remaining servers from 0.764 to 0.966 (median of ten server draws), although its false-positive
+  rate stays at 5–9%.
 documentclass: article
 numbersections: true
 colorlinks: true
@@ -456,7 +457,8 @@ phrasing; it ranks MCP rows by inverse length.** Its score falls with length on 
 in-distribution PoisonedRAG benign rows on every seed (−0.82 to −0.84); on BIPIA the sign varies
 by seed. Dropping the 241
 benign descriptions shorter than the shortest attack (133 characters) lifts its AUROC to 0.727,
-0.595 and 0.616 (Appendix \ref{app:followup}).
+0.595 and 0.616 (Appendix \ref{app:followup}), but that is the same habit, not detection: in that
+subset the benign rows are the longer ones (median 363 against 292 characters; length alone scores 0.324).
 
 # Deployment: Robustness, Fairness, Cost and Harms {#sec:deploy}
 
@@ -566,12 +568,13 @@ perfectly, ranks MCP tool descriptions by inverse length, and is the easiest to 
 this: the paired model moves toward chance, not above it. We would deploy B1-Optuna, as documented in
 its model card, only on validated surfaces (not on MCP tool descriptions, where it catches 35% of
 attacks at 6.9% FPR), with input normalization, per-surface thresholds,
-review rather than automatic blocking, and architectural defenses around it. Data from the
-surface helped where a larger model did not. In follow-up analyses outside the pre-registered
-protocol, refitting B1-Optuna with the descriptions of two MCPTox servers lifts its AUROC on the
-other 43 from 0.764 to 0.966 (length-binned 0.724 → 0.953; medians over ten server draws, each
-compared on the same servers), and training on MSB's 91 tool descriptions alone reaches 0.859 on
-MCPTox, above length (Appendix \ref{app:followup}). We did not give DeBERTa the same data, and
+review rather than automatic blocking, and architectural defenses around it. On MCPTox, data
+from the surface helped where a larger model did not. In follow-up analyses outside the
+pre-registered protocol, refitting B1-Optuna with the descriptions of two MCPTox servers lifts its
+AUROC on the other 43 from 0.764 to 0.966 (length-binned 0.724 → 0.953; medians over ten server
+draws, each compared on the same servers; single draws 0.835–0.976), although FPR stays at 5–9%
+against the 1% target. Training on MSB's 91 tool descriptions alone is a modest gain
+(length-binned 0.762 against 0.725; Appendix \ref{app:followup}). We did not give DeBERTa the same data, and
 both results come from two benchmarks; the next step is benign and
 adversarial tool descriptions from a source other than MCPTox, with MCPTox kept as the held-out
 test.
@@ -654,12 +657,13 @@ information.
 
 ![B2 (seed 7268) score against length on MCPTox. Scores fall with length for both labels; attacks are longer, so the raw ordering is below chance.](../followup/b2_length.png){#fig:b2length width=70%}
 
-**Is the bottleneck data?** We refit B1-Optuna, with its committed settings, on the training
+**On MCPTox, is the bottleneck data?** We refit B1-Optuna, with its committed settings, on the training
 split plus every description of $k$ randomly drawn MCPTox servers and test on the remaining
 servers (ten draws per $k$; the threshold stays at 1% FPR on in-distribution validation). On the
 same held-out servers, two added servers lift AUROC from 0.764 to 0.966 and length-binned AUROC
-from 0.724 to 0.953 (medians; the paired lift is positive in every draw, +0.07 to +0.22); recall at the
-deployed threshold rises from 0.348 to 0.886 while FPR stays near 6% (Figure \ref{fig:fewshot}).
+from 0.724 to 0.953 (medians; single draws 0.835–0.976; the paired lift is positive in every draw,
++0.07 to +0.22); recall at the deployed threshold rises from 0.348 to 0.886 while FPR stays at 5–9%
+(median 6.5%), so the threshold still does not transfer (Figure \ref{fig:fewshot}).
 
 ![B1-Optuna on held-out MCPTox servers after adding $k$ servers to training: median and interquartile range over ten server draws. $k=0$ is the pre-registered result.](../followup/few_shot.png){#fig:fewshot width=70%}
 
@@ -672,10 +676,11 @@ deployed threshold rises from 0.348 to 0.886 while FPR stays near 6% (Figure \re
 Table: B1-Optuna trained on tool descriptions. Out-of-fold scores from separately fitted fold models are pooled into one AUROC; the threshold is 1% FPR on each fold's training benign rows, which the model fits too closely to carry over, so recall at these FPRs says little. Folds never share a server. {#tbl:insurface}
 
 **How learnable is the surface?** Inside MCPTox the surface is close to separable, even for a
-template the model never saw (Table \ref{tbl:insurface}), so the detector learns more than the
-three templates' wording, although every MCPTox template shares the benchmark's authors. A
-different source transfers too: trained only on MSB, the model reaches 0.859 on MCPTox, above
-length's 0.774, with a threshold that 21 benign rows cannot set.
+template the model never saw (Table \ref{tbl:insurface}). Separation this easy suggests the model
+learns MCPTox's generation style, which every template shares, rather than injection in tool
+descriptions at large, so we claim the data result for MCPTox only. A different source helps only
+modestly: trained only on MSB, the model reaches 0.859 on MCPTox, but its length-binned AUROC is
+0.762 against the base model's 0.725, at 45% FPR, with a threshold that 21 benign rows cannot set.
 
 # Model Card {#app:card}
 
