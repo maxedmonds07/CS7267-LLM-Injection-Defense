@@ -108,7 +108,8 @@ Source: [b1_tfidf_lr_optuna.csv](report/baselines/b1_tfidf_lr_optuna.csv), [fair
 The fine-tuned DeBERTa-v3-base reaches test AUROC 0.987 ± 0.004 over three seeds but ranks MCP
 tool descriptions below chance (0.346 ± 0.128) and fails its pre-registered success criterion
 on every seed ([b2_verdict.md](report/baselines/b2_verdict.md)). On MCPTox it scores 98–100%
-of rows, benign and attack alike, below 0.01, so it does not respond to the surface at all. It
+of rows, benign and attack alike, below 0.01, and among those scores it rates longer text as more benign, so it ranks MCP rows
+by inverse length rather than by their phrasing. It
 is also the most brittle detector: leetspeak cuts its recall on rewritten test attacks from
 0.984 to 0.110 and random capitalization to 0.124
 ([summary.csv](report/red_team/deberta_row2_s7267/summary.csv)). It is about 100 times slower than B1-Optuna (56 ms per text on the

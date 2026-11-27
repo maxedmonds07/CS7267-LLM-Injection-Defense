@@ -21,13 +21,13 @@ abstract: |
   learned the *voice* of the training attacks, second-person phrasing about the model's
   response ("in your response", "reply"); the word *your* alone appears in 44.5% of
   in-distribution test attacks but 2.7% of MCP attacks. Half of MCP attacks are instead written as tool procedure ("before
-  using X, you must first call Y"), a phrasing found in 1% of in-distribution test attacks. DeBERTa
-  scores 98–100% of MCP tool descriptions below 0.01, so its below-chance AUROC is noise
-  among near-zero scores, and it is also the most brittle model: leetspeak cuts its recall
+  using X, you must first call Y"), a phrasing found in 1% of in-distribution test attacks. DeBERTa's
+  below-chance AUROC is not noise: its scores fall as text gets longer, and MCP attacks are
+  longer than benign descriptions, so it ranks MCP rows by inverse length. It is also the most brittle model: leetspeak cuts its recall
   from 0.984 to 0.110. False alarms fall on long benign tool documentation (14.3% false-positive
   rate on the longest quarter against a 1% target). We release the code, a model card, and a
   harm-by-harm mitigation plan, and argue that the bottleneck is training data from the
-  surface, not model capacity.
+  surface; the highest in-distribution score did not predict transfer.
 documentclass: article
 numbersections: true
 colorlinks: true
@@ -53,7 +53,9 @@ agent reads before it decides which tool to call. An attacker who controls any o
 plant instructions without interacting with the user, an attack Greshake et al. named *indirect
 prompt injection* [@greshake2023indirect]. MCP widens the surface: a poisoned tool description
 enters the context when a server is registered, before any tool runs, and reaches 72.8% attack
-success on o1-mini [@wang2026mcptox].
+success on o1-mini, the highest of 20 agents tested [@wang2026mcptox]. The same authors find that
+payloads from indirect-injection benchmarks, placed into tool descriptions, almost never succeed:
+attacks that work on this surface are written differently.
 
 A cheap defense is a detector that screens each untrusted segment before the model reads it.
 Detectors are usually evaluated on the same benchmarks they were trained on, where standard
@@ -150,7 +152,7 @@ inference data learn annotation artifacts such as negation words [@gururangan201
 syntactic heuristics such as word overlap [@mccoy2019right], and score well until a test set
 breaks the artifact. Domain-generalization work therefore holds out whole domains at test time
 [@gulrajani2021search; @koh2021wilds]. Injection detection has only recently adopted this
-practice. Fomin shows that injection classifiers learn dataset identity, with 28–44% of their top
+practice. Fomin shows that injection classifiers over LLM activations learn dataset identity, with 28–44% of their top
 features being dataset shortcuts, and that leave-one-dataset-out testing lowers AUROC
 [@fomin2026benchmarks]. Concurrently with our work, Liu replays benign tool calls from two agent
 benchmarks, finds that detector rankings on BIPIA do not carry over to agent tool outputs, and
@@ -214,7 +216,7 @@ held-out source or the test split reaches fitting.
 source-specific tool layouts) and 47 duplicate texts. Length remains a shortcut, and its
 direction flips between sources (Table \ref{tbl:data}): poisoned passages are shorter than real
 ones, poisoned tool descriptions longer than clean ones. A logistic regression on log length is
-near chance in distribution (AUROC 0.491) but reaches 0.774 on MCPTox and 0.866 on MSB, so every
+near chance in distribution (AUROC 0.491) but reaches 0.774 on MCPTox and 0.866 on MSB (indicative: 21 benign rows), so every
 detector is reported next to it.
 
 **Ethics of the data.** All rows come from public benchmarks; the project collects nothing from
@@ -290,11 +292,14 @@ Table: Held-out results. Test: 827 benign / 607 adversarial; MCPTox: 362 / 485; 
 B1-Optuna improves on B1 (0.922 vs 0.902, above B1's interval), and both rank by more than length
 (length-binned AUROC 0.989 ± 0.003 and 0.918). Length and perplexity are near chance.
 
-**On MCP tool descriptions the order reverses.** B1-Optuna is the strongest trained detector but
+**On MCP tool descriptions the order reverses.** B1-Optuna is the strongest trained detector by raw AUROC but
 only ties raw length, with overlapping intervals; its length-binned AUROC of 0.725 shows that it
 does rank within texts of similar length, so it is a weak detector rather than a length proxy.
-B2 and B0 fall *below chance*. The deployed threshold does not carry over either: 1% FPR on
-validation becomes 6.9% for B1-Optuna on MCPTox, and B2's near-zero FPR comes with a recall of
+B2 and B0 fall *below chance* by raw AUROC, but B0 has the highest length-binned AUROC in the
+table (0.739): within texts of similar length it ranks attacks above benign rows, and only the
+length difference between the classes inverts its raw ordering. The deployed threshold does not
+carry over either: 1% FPR on validation becomes 6.9% for B1-Optuna on MCPTox, where it catches
+34.8% of attacks, and B2's near-zero FPR comes with a recall of
 0.008. **B2 fails its pre-registered criterion on every seed** (Table \ref{tbl:verdict}): no
 seed's lower bound on TPR at 5% FPR clears B1's 0.225, and two of three seeds also fail the
 length-binned condition. MSB (21 benign rows) is indicative only, but shows the same pattern.
@@ -312,7 +317,9 @@ a little in distribution (0.995 → 0.987) and does not move MCPTox AUROC (0.357
 Removing PoisonedRAG from B2's training, which we expected to help by removing its reversed
 length cue, makes MCPTox *worse* (0.346 → 0.199): more varied training text helps more than a
 cleaner length signal. Across all nine B2 runs, test AUROC is 0.92–0.997 and MCPTox AUROC
-0.147–0.491. The ordering on the unseen surface is the reverse of capacity.
+0.147–0.491. The highest in-distribution score did not predict transfer. B1 and B2 differ in
+loss, pooling, tokenization and case handling as well as size, so these runs cannot isolate
+capacity.
 
 | Detector (B4 rows) | Test AUROC | MCPTox AUROC | binned | MSB | MCPTox TPR at 5% FPR |
 |:-----------------|:---------------|:---------------|:---------------|:---------------|:---------------|
@@ -330,8 +337,8 @@ fits in distribution and stays below chance on both holdouts, where length alone
 0.907 on the same rows. Adding the task (`text` → `pair`) raises MCPTox AUROC from 0.339 to 0.506
 on every seed, but its length-binned AUROC falls from 0.672 to 0.455 and TPR at matched 5% FPR
 stays below 0.05: the model becomes less wrong, not a detector. The relevance features, the
-change B4 was built to test, lower MCPTox AUROC to 0.454 (two of three seeds) and MSB AUROC on
-every seed. Training on BIPIA only again makes MCPTox worse (0.454 → 0.397), as it did for B2.
+change B4 was built to test, do not help: MCPTox AUROC is 0.454 ± 0.099 (below `pair` on two of
+three seeds), and MSB AUROC falls on every seed. Training on BIPIA only again makes MCPTox worse (0.454 → 0.397), as it did for B2.
 Validation cannot choose among these: three configurations reach validation TPR of at least 0.998
 at 1% FPR. A second, independent run of all twelve fine-tunes reached the same conclusions,
 although single-seed holdout AUROC moved by up to 0.21 between runs because GPU training is not
@@ -344,7 +351,8 @@ Nothing learned there feeds back into a reported detector.
 
 ## A failure-mode taxonomy {#sec:taxonomy}
 
-We read a sample of MCPTox errors, wrote a codebook of six regular-expression cues, and assigned
+We read a sample of MCPTox errors, wrote a codebook of six regular-expression cues (written
+after reading holdout errors, and used by no detector), and assigned
 every error at the deployed threshold to the first matching category. The codebook was revised
 once, then checked on 40 fresh errors drawn with a different seed: its category matched a reading
 of the full text for 36 of 40 rows (90%). The check was made by the AI assistant that wrote the
@@ -363,8 +371,13 @@ Table: Left: missed MCPTox attacks at the deployed threshold by category (B1-Opt
 **MCP attacks are written as tool procedure** (Table \ref{tbl:taxonomy}). Half of them are a
 fake rule inside a tool's description telling the agent to call another tool first; a third
 change an argument. These phrasings occur in 1.0% and 0.2% of training-pool test attacks against
-50.7% and 37.3% of MCPTox attacks. The surface is learnable, since the prerequisite cue occurs in
-only 0.6% of MCPTox's *benign* descriptions, but the detectors were never shown it. The false
+50.7% and 37.3% of MCPTox attacks. Because the prerequisite cue is in half of all attacks, its
+59% share of B1-Optuna's misses is close to its base rate; the informative contrast is that
+B1-Optuna misses 75% of prerequisite attacks (185 of 246) against 55% of the rest (131 of 239).
+The surface is learnable, since the prerequisite cue occurs in only 0.6% of MCPTox's *benign*
+descriptions: that single regex would flag 50.7% of attacks at 0.6% FPR, against B1-Optuna's
+34.8% at 6.9%. It was written after reading holdout errors, so it is an oracle reference, not a
+detector, but the trained detectors were never shown the cue. The false
 alarms mirror this: half of B1-Optuna's 25 are benign descriptions that give the model usage
 instructions ("IMPORTANT: always use absolute paths").
 
@@ -428,14 +441,16 @@ the top-attributed tokens are *your*, *response*, *reply* and *in*: two very dif
 learned the same cue from BIPIA. On MCPTox, attacks and benign descriptions have the same median
 logit, attribution falls on formatting tokens, and even "you MUST first use" pushes toward
 benign (Figure \ref{fig:saliency}). Across all three seeds B2 scores 98–100% of MCPTox rows below 0.01. Its below-chance
-AUROC is therefore not a confident inversion but an ordering of near-zero scores set by
-formatting: **B2 does not respond to the surface at all.**
+AUROC is not a confident inversion, but it is not noise either: among these near-zero scores B2
+rates longer text as more benign, a habit PoisonedRAG's short poisoned passages would teach, and
+MCP attacks are longer than benign descriptions. **B2 does not respond to the surface's
+phrasing; it ranks MCP rows by inverse length.**
 
 # Deployment: Robustness, Fairness, Cost and Harms {#sec:deploy}
 
 **Robustness to rewrites.** Each test-split attack is rewritten eleven ways (character
 obfuscation, format wrappers, paraphrase, reordering), and recall is measured at each detector's
-5% validation-FPR threshold (Table \ref{tbl:noise}). Meaning-preserving rewrites (synonyms,
+5% validation-FPR threshold, not the deployed 1% one, on in-distribution attacks only (Table \ref{tbl:noise}; B2 is seed 7267). Meaning-preserving rewrites (synonyms,
 polite rewording, sentence shuffling) cost every detector at most 0.05. Character obfuscation is
 the cheapest evasion, and **the most accurate detector is the most brittle**: B2's case-sensitive
 subword tokenizer turns a still-readable rewrite into unfamiliar pieces, so random capitalization
@@ -482,7 +497,7 @@ Table: Error rates by group at the deployed threshold (target FPR 1%). Length qu
 scores a text in **0.58 ms** on one CPU core with 377,215 weights; B2 takes 56.2 ms on the same
 CPU and 44.0 ms on the laptop GPU, with 184.4 M parameters; B0 takes 57.6 ms. B1-Optuna's whole
 search took 55 minutes on a CPU and its refit 7 seconds; B2's nine runs and sweeps took an
-estimated 6–9 T4 GPU-hours (run times were not recorded). Each full B4 grid of twelve fine-tunes took 3.5–3.7 Colab GPU-hours to train, 15–20 minutes per run, in two independent runs. The detector that transfers best is also
+estimated 6–9 T4 GPU-hours (run times were not recorded). Each full B4 grid of twelve fine-tunes took 3.5–3.7 Colab GPU-hours to train, 15–20 minutes per run, in two independent runs. The only trained detector that matches length on MCPTox is also
 about 100 times cheaper. B2's near-zero MCPTox FPR is not fairness: it flags almost nothing there,
 attack or benign.
 
@@ -500,9 +515,9 @@ Table: Inference cost on the same 1,000 test rows (mean 1,056 characters) after 
 |:-----------------------|:-------------------------|:----------------------------------------|
 | False sense of security | 0.99 AUROC in distribution, below chance off surface | Score only validated surfaces; publish the out-of-scope list (model card) |
 | Blocking legitimate content | 14.3% FPR on long benign tool docs | Per-surface thresholds; review instead of block; train on benign tool docs |
-| Dual use of this work | Leetspeak: 0.725 → 0.213 recall | Release aggregates, not an evasion recipe; normalize input |
+| Dual use of this work | B1-Optuna leetspeak recall 0.725 → 0.213 (5% FPR threshold) | Release aggregates, not an evasion recipe; normalize input |
 | Dataset as attack corpus | Working injections in one place | Rows stay in a private remote; commit scores and ids, not text |
-| Over-reliance | Best detector misses 65% of MCP attacks | Privilege separation, tool allow-lists, confirmation of side effects |
+| Over-reliance | B1-Optuna misses 65% of MCP attacks at its deployed 1% threshold | Privilege separation, tool allow-lists, confirmation of side effects |
 | Opaque blocking | Authors cannot see why they are flagged | Log score and threshold; appeal path; per-surface drift monitoring |
 
 Table: Harms of deploying an injection detector, the result that grounds each, and a mitigation. {#tbl:harms}
@@ -518,21 +533,26 @@ Cyrillic look-alikes nor digits to Latin letters. Normalization is necessary, no
 not new data, so we could not test the fix we recommend: adding tool descriptions to training.
 B4's MCP task context is a server-level catalogue rather than an observed request, and it
 excludes holdout rows without one. The holdouts are small (MSB has 21 benign rows) and
-come from single benchmarks. B2's search covered two values of one hyperparameter, its seeds
+come from single benchmarks, so a shift of surface is also a shift of benchmark authors; MCPTox's
+485 attacks come from three templates (77, 183 and 225 rows), so its holdout tests three
+phrasings, not the surface at large. We trained every detector we report: no off-the-shelf
+detector or LLM-judge baseline was scored. Wilson intervals treat rows as independent, although
+tool descriptions cluster by server. B2's search covered two values of one hyperparameter, its seeds
 disagree widely on MCPTox (0.247–0.491), and its robustness, saliency and latency results use one
-seed. The error codebook was validated by its author, an AI assistant, not by independent human
-coders. Integrated gradients depend on the baseline, and we use one. We measure detection, not
+seed. The error codebook was written after reading holdout errors and validated by its author, an AI
+assistant, not by independent human coders. Integrated gradients depend on the baseline, and we use one. We measure detection, not
 the end-to-end reduction in attack success of a defended agent [@debenedetti2024agentdojo].
 
 **Conclusion.** Detectors trained on RAG passages and tool outputs do not transfer to MCP tool
 descriptions because they learned a *voice*, not a *behavior*. Both the TF-IDF model and DeBERTa
 key on second-person phrasing about the model's response, the way BIPIA's attacks are written;
 MCP attacks are written as tool procedure, a phrasing the training data almost never contains,
-and benign tool documentation that happens to say "in your account" is flagged. More capacity
-made this worse, not better: DeBERTa fits its training surfaces almost perfectly, does not
-respond to the new one, and is the easiest to evade. Letting it read the user's task does not fix
+and benign tool documentation that happens to say "in your account" is flagged. The highest
+in-distribution score did not predict transfer: DeBERTa fits its training surfaces almost
+perfectly, ranks MCP tool descriptions by inverse length, and is the easiest to evade. Letting it read the user's task does not fix
 this: the paired model moves toward chance, not above it. We would deploy B1-Optuna, as documented in
-its model card, only on validated surfaces, with input normalization, per-surface thresholds,
+its model card, only on validated surfaces (not on MCP tool descriptions, where it catches 35% of
+attacks at 6.9% FPR), with input normalization, per-surface thresholds,
 review rather than automatic blocking, and architectural defenses around it. The next step is not
 a larger model but different data: benign and adversarial tool descriptions from a source other
 than MCPTox, with MCPTox kept as the held-out test.
