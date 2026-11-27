@@ -67,6 +67,8 @@ A second team member repeated the full grid with the same configuration, dataset
 
 The conclusions are the same in both runs. Seed 7267 in the second run is the exception to the context gain on both holdouts. [Second-run summary](../report/b4/rerun/summary.md) · [Per-run metrics](../report/b4/rerun/per_run.csv) · [Per-seed differences](../report/b4/rerun/ablation_deltas.csv) · [Validation results](../report/b4/rerun/validation_selection.csv)
 
+The second run's per-row scores are tracked with DVC in `report/b4_scores/rerun/`, one file per run (`b4-<configuration>-s<seed>.parquet`, with columns `id`, `label`, `text_sha256`, `context_sha256`, `score` and `eval_set`). Fetch them with `uv run dvc pull report/b4_scores.dvc`. They reproduce every AUROC in the second run's `per_run.csv`. Per-row scores for the first run are not tracked.
+
 To retrieve the B4 values in the table, filter `seed_summary.csv` to `experiment = relevance`, `slice = all`, and `metric = auroc`. Its 95% t-intervals describe variation in the mean across training seeds. The AUROC intervals in `per_run.csv` use 1,000 bootstrap resamples of evaluation rows within each label for a single trained model. [Metrics across seeds](../report/b4/seed_summary.csv) · [Per-run metrics](../report/b4/per_run.csv)
 
 ## Reproducing the completed study

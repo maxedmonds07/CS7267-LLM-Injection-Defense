@@ -1,0 +1,6 @@
+outs:
+- md5: 8884c05ac532b546db55d50148160894.dir
+  size: 4262794
+  nfiles: 12
+  hash: md5
+  path: b4_scores
