@@ -2,14 +2,10 @@
 injection detector; follow-up analysis outside the pre-registered protocol).
 
 The model is gated: accept the Llama 4 Community License for
-meta-llama/Llama-Prompt-Guard-2-86M on Hugging Face first, then run on a Colab T4:
-
-    !git clone <repo> && cd CS7267-LLM-Injection-Defense && pip install uv
-    !uv sync --group deberta && make data          # needs the team's DVC credentials
-    import os; os.environ["HF_TOKEN"] = "<your token>"
-    !PYTHONPATH=src/data:src/eval:src/models uv run python scripts/prompt_guard_colab.py
-
-and download both files in report/offshelf_scores/ into the same path locally:
+meta-llama/Llama-Prompt-Guard-2-86M on Hugging Face first, then run
+notebooks/prompt_guard_colab.ipynb on a Colab T4. It reads HF_TOKEN and the R2 keys from Colab
+Secrets, checks the model on three texts, and runs both passes (windowed, then --truncate).
+Save the files it writes in report/offshelf_scores/:
 - prompt-guard-2.parquet: the B2 score-file layout, so the harness reads it with
   `--detector deberta --scores <file>`; it reports as offshelf_prompt_guard_2, not as a DeBERTa run.
   It lives outside report/deberta_scores so the B2 verdict never picks it up.
