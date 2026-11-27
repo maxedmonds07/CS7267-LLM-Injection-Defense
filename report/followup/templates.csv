@@ -1,0 +1,4 @@
+template,attacks,length_auroc,b1_optuna_auroc,b1_optuna_recall
+Template-1,77,0.776,0.733,0.299
+Template-2,183,0.761,0.736,0.213
+Template-3,225,0.784,0.805,0.476
