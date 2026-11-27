@@ -14,7 +14,7 @@ the pre-registered protocol (`make followup-length`, `make followup-transfer`).
 | 4 | The question: does a detector transfer to a surface it never saw? | Adedapo Odeyemi | 0:40 |
 | 5 | Data: 11,005 segments, with MCP held out whole | Max Edmonds | 1:00 |
 | 6 | Text length alone is strong off-surface | Carter Corbin | 0:45 |
-| 7 | Four detector families, one harness | Mohammed Adil Ahmed, then Oluwamayowa Adewummi | 1:00 |
+| 7 | Three detector families, one harness | Mohammed Adil Ahmed, then Oluwamayowa Adewummi | 1:00 |
 | 8 | Fit in distribution, fail off surface (AUROC figure) | Oluwamayowa Adewummi | 1:00 |
 | 9 | On MCP tool descriptions, the order reverses (results table) | Max Edmonds | 1:00 |
 | 10 | MCP attacks are written as tool procedure | Adedapo Odeyemi | 1:00 |
@@ -105,10 +105,12 @@ Ahmed 2:45, Oluwamayowa Adewummi 1:55.
 ## 12. DeBERTa ranks MCP rows by inverse length — Adedapo Odeyemi (DeBERTa model, integrated gradients)
 
 - **Visual:** `report/phase5/saliency/heatmaps.png`.
-- Same voice on test attacks; MCP attacks and benign rows share a median logit of −8.61;
-  98–100% of MCP rows score below 0.01.
-- Not noise: scores fall with length (Spearman −0.45 to −0.77 by seed); keeping only benign rows
-  at least as long as the shortest attack lifts AUROC to 0.60–0.73 (*follow-up*).
+- Same voice on test attacks; on MCP, attribution falls on formatting tokens and "you MUST
+  first use" pushes toward benign.
+- Inverse length: scores fall with length (Spearman −0.45 to −0.77 by seed) and MCP attacks are
+  longer. Keeping only benign rows at least as long as the shortest attack gives 0.60–0.73
+  (*follow-up*), but there the benign rows are the longer ones (median 363 vs 292 characters):
+  the same habit, not detection.
 
 ## 13. Reading the task does not help (B4) — Mohammed Adil Ahmed
 
@@ -140,8 +142,12 @@ Ahmed 2:45, Oluwamayowa Adewummi 1:55.
 - Detectors learned a voice, not a behavior; the best in-distribution score did not predict
   transfer, and reading the user's task did not fix it.
 - Deploy B1-Optuna with guardrails, not on MCP (35% recall at 6.9% FPR there).
-- The bottleneck is data (*follow-up*): two MCPTox servers in training lift held-out AUROC from
-  0.764 to 0.966 on the same servers; next, tool descriptions from a source other than MCPTox.
+- On MCPTox, the bottleneck is data (*follow-up*): two MCPTox servers in training lift held-out
+  AUROC from 0.764 to 0.966 on the same servers (median of ten draws; single draws 0.835–0.976).
+  FPR stays at 5–9% against the 1% target, so the threshold still does not transfer.
+- Notes only: in-surface folds score 0.996–0.999, likely MCPTox's generation style, hence the
+  scope; MSB → MCPTox is a modest gain (length-binned 0.762 vs 0.725, at 45% FPR). Next: tool
+  descriptions from a source other than MCPTox.
 
 ## Backup slides
 
