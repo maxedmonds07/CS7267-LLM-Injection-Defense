@@ -145,3 +145,10 @@ def test_truncated_run_is_named_and_written_apart(tmp_path):
     assert PrecomputedScores(path).name == f"{NAME}_truncated" and meta["truncate"] is True
     native = pd.read_csv(tmp_path / "prompt-guard-2-truncated_native.csv")
     assert native["truncate"].all()
+
+
+def test_default_device_prefers_cuda_then_apple_gpu_then_cpu():
+    from prompt_guard_colab import default_device
+    assert default_device(cuda=True, mps=True) == "cuda"
+    assert default_device(cuda=False, mps=True) == "mps"
+    assert default_device(cuda=False, mps=False) == "cpu"

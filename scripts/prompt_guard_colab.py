@@ -91,6 +91,11 @@ def malicious_index(id2label: dict) -> int:
     return named[0] if named else 1
 
 
+def default_device(cuda: bool, mps: bool) -> str:
+    """NVIDIA GPU (Colab), then Apple GPU (a Mac), then CPU."""
+    return "cuda" if cuda else "mps" if mps else "cpu"
+
+
 def hf_scorer(model_name=MODEL, device=None, truncate=False):
     """Batch scorer: probability of the malicious class, max over each text's windows. Counts the
     texts that needed more than one window in the `chunked` attribute."""
@@ -102,7 +107,7 @@ def hf_scorer(model_name=MODEL, device=None, truncate=False):
     tokenizer.model_max_length = 10**9  # we chunk ourselves; silence the length warning
     model = AutoModelForSequenceClassification.from_pretrained(model_name, token=token).eval()
     positive = malicious_index(model.config.id2label)
-    device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    device = device or default_device(torch.cuda.is_available(), torch.backends.mps.is_available())
     model.to(device)
     pad = tokenizer.pad_token_id
 
@@ -175,11 +180,12 @@ def main(argv=None):
     ap.add_argument("--data", default=str(DEFAULT_PATH))
     ap.add_argument("--out", default=None, help=f"default {OUT.name}, or its -truncated twin")
     ap.add_argument("--batch-size", type=int, default=32)
+    ap.add_argument("--device", default=None, help="cuda, mps or cpu (default: the fastest available)")
     ap.add_argument("--truncate", action="store_true",
                     help="score only each text's first 512-token window, to measure what truncation costs")
     args = ap.parse_args(argv)
     out = args.out or str(OUT.with_stem(f"{OUT.stem}-truncated") if args.truncate else OUT)
-    detector = PromptGuardDetector(scorer=hf_scorer(truncate=args.truncate), batch_size=args.batch_size)
+    detector = PromptGuardDetector(scorer=hf_scorer(device=args.device, truncate=args.truncate), batch_size=args.batch_size)
     summary = score_file(detector, load_data(args.data), out)
     print(f"wrote {out}\n{summary.to_string(index=False, float_format='%.3f')}")
 
