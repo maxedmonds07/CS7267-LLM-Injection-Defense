@@ -26,7 +26,8 @@ class PrecomputedScores:
             raise ValueError(f"{int((label_conflicts > 1).sum())} texts have different labels in {path}")
         self._scores = dict(zip(frame.text_sha256, frame.score))
         self._labels = {key: int(label) for key, label in zip(frame.text_sha256, frame.label)}
-        self.name = f"deberta_{meta['row']}"
+        # Off-the-shelf detectors written in this layout carry their own name.
+        self.name = meta.get("name") or f"deberta_{meta['row']}"
         self.seed = meta["seed"]
         self.val_only = bool(meta.get("val_only", False))
         self.params = {
