@@ -19,7 +19,7 @@ NEWSQA_CSV := data/external/newsqa/combined-newsqa-data-v1.csv
 NEWSQA_COMMIT := d5bb9e9640e2ed7a31e209393376549d737d276b
 NEWSQA_IMAGE := bryant1410/newsqa@sha256:be80e12652517a01bded32156578abe406f5bbb1f643350f46f6007c6be65423
 
-.PHONY: followup-offshelf help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 report-phase5 phase5 phase5-scores phase5-fairness phase5-errors phase5-shap phase5-saliency phase5-latency red-team-b2 b2-checkpoint followup-length followup-transfer report-final check-final eda-report evaluate shortcut-check red-team red-team-data b1-optuna b2-report
+.PHONY: demo followup-offshelf help install r2-remote r2-credentials r2-check r2-check-write check-remote data push-data push-large newsqa report phase4-tables report-phase4 report-phase5 phase5 phase5-scores phase5-fairness phase5-errors phase5-shap phase5-saliency phase5-latency red-team-b2 b2-checkpoint followup-length followup-transfer report-final check-final eda-report evaluate shortcut-check red-team red-team-data b1-optuna b2-report
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -207,6 +207,9 @@ phase5-latency: ## Inference latency, size and fit time per detector (run on an 
 
 followup-length: ## Follow-up: B2 vs length, MCPTox templates, paired server bootstrap -> report/followup/
 	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/followup_length.py
+
+demo: ## Live demo: four held-out rows scored by B1-Optuna; ARGS="--no-pause" | "--interactive" | "--prompt-guard"
+	uv run $(if $(findstring --prompt-guard,$(ARGS)),--group deberta,) python scripts/demo.py $(ARGS)
 
 followup-offshelf: ## Follow-up: Prompt Guard 2 vs length and B1-Optuna on MCPTox (needs report/offshelf_scores) -> report/followup/offshelf.json
 	PYTHONPATH="$(SRC_PATH)" uv run python src/eval/followup_offshelf.py
