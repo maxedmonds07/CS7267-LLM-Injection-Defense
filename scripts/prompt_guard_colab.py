@@ -20,9 +20,10 @@ run measures what truncation would have cost.
 
 Framing for the paper: Prompt Guard 2's malicious label covers text that explicitly tries to
 override earlier instructions; MCPTox attacks are implicit tool procedure, so a low score there is
-partly by design. Write "a public detector not built for this surface also misses it". Its training
-mix includes open-source and curated injection data, so BIPIA overlap cannot be ruled out: the
-in-distribution sets are marked exposure "unknown".
+partly by design. In our run it still ranked MCPTox well within length bins (0.879) while its own cut
+flagged 1.4% of attacks; the report's follow-up appendix gives the reading. Its training mix includes
+open-source and curated injection data, so BIPIA overlap cannot be ruled out: the in-distribution
+sets are marked exposure "unknown".
 """
 
 import argparse

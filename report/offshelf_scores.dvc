@@ -1,0 +1,6 @@
+outs:
+- md5: a60f6d36212c39961411cb5ae30a8dab.dir
+  size: 574519
+  nfiles: 4
+  hash: md5
+  path: offshelf_scores

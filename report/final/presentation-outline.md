@@ -1,7 +1,7 @@
 # Presentation outline: Detectors Learn a Voice, Not a Behavior
 
 Outline of the final presentation deck (a Claude Slides artifact; ask the team for the link).
-About 13.75 minutes plus Q&A: 17 main slides and 3 backup slides. Each person presents the slides
+About 13.75 minutes plus Q&A: 17 main slides and 4 backup slides. Each person presents the slides
 that use the method they built (paper §9). Every number comes from `report/final/report.md`;
 figure paths are relative to the repo root. Numbers marked *follow-up* come from analyses outside
 the pre-registered protocol (`make followup-length`, `make followup-transfer`).
@@ -25,7 +25,7 @@ the pre-registered protocol (`make followup-length`, `make followup-transfer`).
 | 15 | Harms and mitigations | Mohammed Adil Ahmed | 0:45 |
 | 16 | Team contributions: who built what | Oluwamayowa Adewummi | 0:30 |
 | 17 | Conclusion | Mohammed Adil Ahmed | 0:45 |
-| 18–20 | Backup: limitations, per-seed verdict, local SHAP | anyone | — |
+| 18–21 | Backup: limitations, Prompt Guard 2, per-seed verdict, local SHAP | anyone | — |
 
 Time per speaker: Max Edmonds 3:35, Adedapo Odeyemi 3:30, Carter Corbin 2:00, Mohammed Adil
 Ahmed 2:45, Oluwamayowa Adewummi 1:55.
@@ -145,6 +145,8 @@ Ahmed 2:45, Oluwamayowa Adewummi 1:55.
 - On MCPTox, the bottleneck is data (*follow-up*): two MCPTox servers in training lift held-out
   AUROC from 0.764 to 0.966 on the same servers (median of ten draws; single draws 0.835–0.976).
   FPR stays at 5–9% against the 1% target, so the threshold still does not transfer.
+  Prompt Guard 2, trained on more injection data, also ranks MCPTox better, yet flags 1.4% of
+  attacks at its own cut.
 - Notes only: in-surface folds score 0.996–0.999, likely MCPTox's generation style, hence the
   scope; MSB → MCPTox is a modest gain (length-binned 0.762 vs 0.725, at 45% FPR). Next: tool
   descriptions from a source other than MCPTox.
@@ -153,7 +155,11 @@ Ahmed 2:45, Oluwamayowa Adewummi 1:55.
 
 - **Limitations:** small single-benchmark holdouts (surface confounded with benchmark); MCPTox's
   three templates; B2 seed variance (0.247–0.491) and single-seed analyses; B4 uses server task
-  catalogues; no off-the-shelf or LLM-judge baseline; error regexes written after reading holdout
+  catalogues; one off-the-shelf detector (Prompt Guard 2), scored after the pre-registered run, and no LLM judge; error regexes written after reading holdout
   errors and codebook validated by its author; detection, not end-to-end attack success.
+- **Prompt Guard 2 (*follow-up*):** zero-shot, released before MCPTox. MCPTox AUROC 0.819,
+  length-binned 0.879 (best of any detector), recall 0.138 at FPR 0.022 at our threshold, but
+  0.014 at its own 0.5 cut; lead over length +0.045 (−0.073 to +0.164) across 45 servers, not
+  significant. Test 0.571: BIPIA instructions 0.81, PoisonedRAG false passages 0.17.
 - **Per-seed verdict:** TPR at 5% FPR 0.208 / 0.039 / 0.041 against B1's 0.225.
 - **Local SHAP:** `report/phase5/shap/b1_optuna_local.png`.
